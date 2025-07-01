@@ -6,7 +6,7 @@ It provides functionality to split secrets into shares and reconstruct them secu
 """
 
 import random
-from typing import List, Tuple, Dict
+from typing import List, Optional, Tuple, Dict
 from Crypto.Util import number
 from Crypto.Random import get_random_bytes
 
@@ -19,7 +19,7 @@ class SMPCCrypto:
     enabling secure computation without revealing individual inputs.
     """
     
-    def __init__(self, prime: int = None):
+    def __init__(self, prime: Optional[int] = None):
         """
         Initialize SMPC crypto with a large prime for finite field operations.
         
