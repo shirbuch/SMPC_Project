@@ -32,9 +32,9 @@ This project demonstrates a practical SMPC implementation where:
                     ┌────────────────────────────────────────┐
                     │           Parties                      │
                     │                                        │
-                    │  Party 1    │  Party 2    │  Party 3   │
-                    │  Share 1_A  │  Share 2_A  │  Share 3_A │
-                    │  Share 1_B  │  Share 2_B  │  Share 3_B │
+                    │  Party A    │  Party B    │  Party C   │
+                    │  Share 1_A  │  Share 1_B  │  Share 1_C │
+                    │  Share 2_A  │  Share 2_B  │  Share 2_C │
                     └────────────────────────────────────────┘
 ```
 
