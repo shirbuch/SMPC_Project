@@ -75,8 +75,8 @@ def demonstrate_basic_workflow():
         share_names = [name for name, _ in shares]
         print(f"   ├─ {party.name}: Received shares {share_names}")
         # Don't show actual share values for security demonstration
-        for share_name, _ in shares:
-            print(f"   │  └─ {share_name}: [HIDDEN FOR PRIVACY]")
+        for share_name, share in shares:
+            print(f"   │  └─ {share_name}: {share}")
     
     # Each party computes local sum
     print_step(3, "Computing Party Sums", "Each party sums their shares locally")
