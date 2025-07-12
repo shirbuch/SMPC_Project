@@ -2,6 +2,18 @@
 
 A Python implementation of Secure Multi-Party Computation using Shamir's Secret Sharing scheme. This system allows multiple parties to collaboratively compute the sum of their private inputs without revealing individual values to each other.
 
+## Running
+Run the parties:
+python party_server.py 1
+python party_server.py 2
+python party_server.py 3
+
+Stop a party:
+ctrl + C
+
+Run the controller:
+python -c "from smpc_system_tcp import SMPCSystemTCP; smpc=SMPCSystemTCP(); smpc.run([100,250], 'demo')"
+
 ## 🧪 Testing
 Run the quick test to verify everything works:
 python quick_test.py
