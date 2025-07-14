@@ -1,282 +1,181 @@
-"""
-Secure Multi-Party Computation (SMPC) System
-
-This module implements a complete SMPC system that allows multiple parties
-to securely compute the sum of their private inputs without revealing
-individual values to each other.
-"""
+# smpc_system.py
 
 from typing import List, Tuple, Dict, Optional
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from smpc_crypto import SMPCCrypto
 
+@dataclass
+class Share:
+    """Represents a single share assigned to a party."""
+    name: str
+    value: int
+    party_id: int
+
+    def short(self) -> str:
+        s = str(self.value)
+        return s[:5] + "..." if len(s) > 5 else s
+
+    def __str__(self) -> str:
+        return f"{self.name}: {self.short()}"
 
 @dataclass
 class Party:
     """Represents a party in the SMPC protocol."""
     id: int
     name: str
-    shares: Dict[str, List[Tuple[str, int]]]  # Maps computation_id to list of (share_name, share_value)
-    
-    def __post_init__(self):
-        if not self.shares:
-            self.shares = {}
+    shares: Dict[str, List[Share]] = field(default_factory=dict)
+    local_sum_shares: Dict[str, Share] = field(default_factory=dict)
 
+    def receive_shares(self, computation_id: str, shares: List[Share]):
+        """Store shares for a computation."""
+        self.shares[computation_id] = shares
+
+    def compute_and_store_local_sum(self, computation_id: str, prime: int):
+        """Compute and store local sum as a share."""
+        if computation_id not in self.shares:
+            raise ValueError(f"{self.name} missing shares for '{computation_id}'")
+        total = sum(share.value for share in self.shares[computation_id]) % prime
+        letter = chr(64 + self.id)  # 1 → A, 2 → B, ...
+        share = Share(name=f"sum_{letter}", value=total, party_id=self.id)
+        self.local_sum_shares[computation_id] = share
 
 class SMPCSystem:
-    """
-    Secure Multi-Party Computation System.
-    
-    Coordinates secure computation between multiple parties using secret sharing.
-    """
-    
+    """Secure Multi-Party Computation System using Shamir's Secret Sharing."""
+
     def __init__(self, num_parties: int = 3, threshold: int = 2):
-        """
-        Initialize SMPC system.
-        
-        Args:
-            num_parties: Number of parties participating in computation
-            threshold: Minimum shares needed to reconstruct secret
-        """
         if threshold > num_parties:
             raise ValueError("Threshold cannot exceed number of parties")
-        
+
         self.num_parties = num_parties
         self.threshold = threshold
         self.crypto = SMPCCrypto()
-        self.parties: List[Party] = []
-        self.computations: Dict[str, Dict] = {}
-        
-        # Initialize parties
-        for i in range(num_parties):
-            party = Party(id=i+1, name=f"Party_{i+1}", shares={})
-            self.parties.append(party)
-        
+        self.parties: List[Party] = [
+            Party(id=i+1, name=f"Party_{i+1}") for i in range(num_parties)
+        ]
+
         logging.basicConfig(level=logging.INFO)
         self.logger = logging.getLogger(__name__)
-    
+
     def submit_secret_values(self, user_values: List[int], computation_id: str = "default") -> bool:
-        """
-        Submit secret values to be shared among parties.
-        Creates shares with names like 1_A, 1_B, 1_C and 2_A, 2_B, 2_C
-        
-        Args:
-            user_values: List of secret values from user
-            computation_id: Unique identifier for this computation
-            
-        Returns:
-            True if successful, False otherwise
-        """
+        if len(user_values) != 2:
+            self.logger.error("Exactly 2 values must be provided")
+            return False
+
         try:
-            if len(user_values) != 2:
-                raise ValueError("Exactly 2 values must be provided")
-            
-            self.logger.info(f"Starting computation '{computation_id}' with {len(user_values)} values")
-            
-            # Create shares for each secret value
-            all_shares = []
-            party_letters = ['A', 'B', 'C', 'D', 'E']  # Support up to 5 parties
-            
-            for secret_idx, secret in enumerate(user_values):
-                shares = self.crypto.create_shares(secret, self.threshold, self.num_parties)
-                # Add share names: secret_idx+1 + party_letter
-                named_shares = []
-                for party_idx, (party_id, share_value) in enumerate(shares):
-                    share_name = f"{secret_idx + 1}_{party_letters[party_idx]}"
-                    named_shares.append((share_name, share_value, party_id))
-                
-                all_shares.append(named_shares)
-                self.logger.info(f"Created {len(named_shares)} shares for secret {secret_idx + 1}")
-            
-            # Distribute shares to parties
-            for party_idx, party in enumerate(self.parties):
-                # Each party gets one share from each secret
-                party_shares = []
-                for secret_idx in range(len(user_values)):
-                    share_name, share_value, party_id = all_shares[secret_idx][party_idx]
-                    party_shares.append((share_name, share_value))
-                
-                # Store shares with computation ID
-                party.shares[computation_id] = party_shares
-                share_names = [name for name, _ in party_shares]
-                self.logger.info(f"Distributed shares {share_names} to {party.name}")
-            
-            # Store computation metadata
-            self.computations[computation_id] = {
-                'num_secrets': len(user_values),
-                'original_values': user_values,  # Only for verification
-                'status': 'shares_distributed',
-                'all_shares': all_shares  # Store for reconstruction
-            }
-            
+            party_letters = ['A', 'B', 'C', 'D', 'E']
+            all_shares: List[List[Share]] = []
+
+            for idx, secret in enumerate(user_values):
+                raw_shares = self.crypto.create_shares(secret, self.threshold, self.num_parties)
+                named = [
+                    Share(
+                        name=f"{idx + 1}_{party_letters[i]}",
+                        value=share_val,
+                        party_id=party_id
+                    )
+                    for i, (party_id, share_val) in enumerate(raw_shares)
+                ]
+                all_shares.append(named)
+
+            for i, party in enumerate(self.parties):
+                shares = [all_shares[0][i], all_shares[1][i]]
+                party.receive_shares(computation_id, shares)
+                self.logger.info(f"Distributed to {party.name}: {[str(s) for s in shares]}")
+
             return True
-            
+
         except Exception as e:
             self.logger.error(f"Error in submit_secret_values: {e}")
             return False
-    
+
     def compute_party_sums(self, computation_id: str = "default") -> Dict[int, int]:
-        """
-        Each party computes the sum of their shares locally.
-        
-        Args:
-            computation_id: Computation identifier
-            
-        Returns:
-            Dictionary mapping party_id to their local sum of shares
-        """
-        if computation_id not in self.computations:
-            raise ValueError(f"Computation '{computation_id}' not found")
-        
-        party_sums = {}
-        
+        results = {}
+        prime = self.crypto.get_prime()
         for party in self.parties:
-            if computation_id not in party.shares:
-                raise ValueError(f"Party {party.name} missing shares for computation '{computation_id}'")
-            
-            # Sum all share values held by this party
-            shares = party.shares[computation_id]
-            local_sum = sum(share_value for _, share_value in shares) % self.crypto.get_prime()
-            
-            party_sums[party.id] = local_sum
-            share_names = [name for name, _ in shares]
-            self.logger.info(f"{party.name} computed sum of shares {share_names}: {local_sum}")
-        
-        # Update computation status
-        self.computations[computation_id]['party_sums'] = party_sums
-        self.computations[computation_id]['status'] = 'party_sums_computed'
-        
-        return party_sums
-    
-    def reconstruct_final_sum(self, computation_id: str = "default") -> int:
+            party.compute_and_store_local_sum(computation_id, prime)
+            share = party.local_sum_shares[computation_id]
+            self.logger.info(f"{party.name} computed local sum: {share.value}")
+            results[party.id] = share.value
+        return results
+
+    def reconstruct_final_sum(self, computation_id: str = "default", party_ids: Optional[List[int]] = None) -> int:
         """
-        Reconstruct the final sum from party sums.
-        
+        Reconstruct the final sum from local computed shares.
+
         Args:
             computation_id: Computation identifier
-            
+            party_ids: Optional list of party IDs to use for reconstruction
+
         Returns:
-            Final sum of all original secret values
+            final_sum: The securely reconstructed sum
         """
-        if computation_id not in self.computations:
-            raise ValueError(f"Computation '{computation_id}' not found")
-        
-        comp_data = self.computations[computation_id]
-        if 'party_sums' not in comp_data:
-            raise ValueError("Party sums not computed yet")
-        
-        # Create shares from party sums for reconstruction
-        party_sums = comp_data['party_sums']
-        reconstruction_shares = [(party_id, sum_value) for party_id, sum_value in party_sums.items()]
-        
-        # Reconstruct the final sum
-        final_sum = self.crypto.reconstruct_secret(reconstruction_shares[:self.threshold])
-        
-        self.logger.info(f"Reconstructed final sum: {final_sum}")
-        
-        # Update computation status
-        self.computations[computation_id]['final_sum'] = final_sum
-        self.computations[computation_id]['status'] = 'completed'
-        
+        computed_share = []
+
+        if party_ids is None:
+            selected_parties = self.parties[:self.threshold]
+        else:
+            selected_parties = [p for p in self.parties if p.id in party_ids]
+
+        for party in selected_parties:
+            share = party.local_sum_shares.get(computation_id)
+            if share is None:
+                raise ValueError(f"{party.name} missing local sum for '{computation_id}'")
+            computed_share.append((party.id, share.value))
+
+        if len(computed_share) < self.threshold:
+            raise ValueError(f"Insufficient shares: {len(computed_share)} provided, need {self.threshold}")
+
+        final_sum = self.crypto.reconstruct_secret(computed_share)
+        self.logger.info(f"Reconstructed final sum: {final_sum} using parties {[p.id for p in selected_parties]}")
         return final_sum
-    
+
     def run_secure_computation(self, value1: int, value2: int, computation_id: str = "default") -> int:
-        """
-        Run complete secure computation workflow.
-        
-        Args:
-            value1: First secret value
-            value2: Second secret value
-            computation_id: Computation identifier
-            
-        Returns:
-            Sum of the two secret values
-        """
-        self.logger.info("Starting secure multi-party computation")
-        
-        # Step 1: Submit and distribute secret shares
+        self.logger.info(f"Starting secure computation for '{computation_id}'")
+
         if not self.submit_secret_values([value1, value2], computation_id):
             raise RuntimeError("Failed to submit secret values")
-        
-        # Step 2: Each party computes sum of their shares
-        party_sums = self.compute_party_sums(computation_id)
-        
-        # Step 3: Reconstruct final sum
-        final_sum = self.reconstruct_final_sum(computation_id)
-        
-        # Verify correctness (only for demonstration)
-        expected_sum = (value1 + value2) % self.crypto.get_prime()
-        if final_sum == expected_sum:
-            self.logger.info("✓ Secure computation completed successfully")
-        else:
-            self.logger.error(f"✗ Computation error: expected {expected_sum}, got {final_sum}")
-        
-        return final_sum
-    
-    def get_computation_status(self, computation_id: str = "default") -> Optional[Dict]:
-        """Get status of a computation."""
-        return self.computations.get(computation_id)
-    
-    def get_party_info(self, party_id: int) -> Optional[Party]:
-        """Get information about a specific party."""
-        for party in self.parties:
-            if party.id == party_id:
-                return party
-        return None
-    
-    def reset_computation(self, computation_id: str = "default") -> None:
-        """Reset a computation and clear all related data."""
-        if computation_id in self.computations:
-            del self.computations[computation_id]
-        
-        for party in self.parties:
-            if computation_id in party.shares:
-                del party.shares[computation_id]
-        
-        self.logger.info(f"Reset computation '{computation_id}'")
 
+        self.compute_party_sums(computation_id)
+        result = self.reconstruct_final_sum(computation_id)
+
+        expected = (value1 + value2) % self.crypto.get_prime()
+        if result == expected:
+            self.logger.info("✓ Computation correct")
+        else:
+            self.logger.error(f"✗ Computation incorrect: expected {expected}, got {result}")
+
+        return result
+
+    def get_party_info(self, party_id: int) -> Optional[Party]:
+        return next((p for p in self.parties if p.id == party_id), None)
+
+    def reset_computation(self, computation_id: str = "default") -> None:
+        for party in self.parties:
+            party.shares.pop(computation_id, None)
+            party.local_sum_shares.pop(computation_id, None)
+        self.logger.info(f"Cleared computation '{computation_id}'")
 
 def main():
-    """Example usage of the SMPC system."""
     print("=== Secure Multi-Party Computation Demo ===")
-    
-    # Initialize SMPC system with 3 parties, threshold of 2
     smpc = SMPCSystem(num_parties=3, threshold=2)
-    
-    # User's secret values
-    secret1 = 100
-    secret2 = 250
-    
-    print(f"User's secret values: {secret1}, {secret2}")
-    print(f"Expected sum: {secret1 + secret2}")
-    print()
-    
-    # Run secure computation
+
+    secret1, secret2 = 100, 250
+    print(f"User's secrets: {secret1}, {secret2}")
+    print(f"Expected sum: {secret1 + secret2}\n")
+
     try:
         result = smpc.run_secure_computation(secret1, secret2)
-        print(f"Secure computation result: {result}")
-        
-        # Show computation details
-        status = smpc.get_computation_status()
-        if status:
-            print(f"Computation status: {status['status']}")
-            if 'party_sums' in status:
-                print("Party sums:", status['party_sums'])
-            
-            # Show share distribution details
-            print("\nShare Distribution:")
-            for party in smpc.parties:
-                if 'default' in party.shares:
-                    shares = party.shares['default']
-                    share_info = [(name, val) for name, val in shares]
-                    print(f"  {party.name}: {share_info}")
-        
+        print(f"Secure computation result: {result}\n")
+
+        for party in smpc.parties:
+            shares = party.shares.get("default", [])
+            print(f"{party.name} shares:")
+            for share in shares:
+                print(f"  {share}")
+
     except Exception as e:
         print(f"Error during computation: {e}")
-        import traceback
-        traceback.print_exc()
-
 
 if __name__ == "__main__":
     main()
