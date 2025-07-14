@@ -5,10 +5,10 @@ Interactive Demo Script for SMPC Collaborative Data Analysis
 
 import sys
 import time
-import logging
 from typing import Optional
 from smpc_system import SMPCSystem
 from smpc_crypto import SMPCCrypto
+import logging
 
 # Disable system logs globally
 logging.getLogger("smpc_system").setLevel(logging.CRITICAL)
