@@ -101,20 +101,18 @@ def demonstrate_security_properties():
         print(f"   Party {party_id}: {share_value}")
 
     print(f"\n🔍 Threshold Security Demonstration:")
+
     print(f"\n❌ Trying to reconstruct with 2 shares (below threshold):")
-    try:
-        crypto.reconstruct_secret(shares[:2])
-        print("   ❌ Unexpected success!")
-    except Exception as e:
-        print(f"   ✅ Properly failed: {e}")
+    r = crypto.reconstruct_secret(shares[:2])
+    print(f"   Result: {r} \n{'❌ Unexpected success' if r == secret else '✅ Properly failed'}")
 
-    print(f"\n✅ Reconstructing with 3 shares:")
+    print(f"\nReconstructing with 3 shares:")
     r = crypto.reconstruct_secret(shares[:3])
-    print(f"   Result: {r} ({'CORRECT' if r == secret else 'INCORRECT'})")
+    print(f"   Result: {r} \n{'✅ CORRECT' if r == secret else '❌ INCORRECT'}")
 
-    print(f"\n✅ Reconstructing with 4 shares:")
+    print(f"\nReconstructing with 4 shares:")
     r = crypto.reconstruct_secret(shares[:4])
-    print(f"   Result: {r} ({'CORRECT' if r == secret else 'INCORRECT'})")
+    print(f"   Result: {r} \n{'✅ CORRECT' if r == secret else '❌ INCORRECT'}")
 
 def demonstrate_different_configurations():
     print("\n" + "="*60)
