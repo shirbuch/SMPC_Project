@@ -15,6 +15,9 @@ Run the controller:
 python -c "from smpc_system_tcp import SMPCSystemTCP; smpc=SMPCSystemTCP(); smpc.run([100,250], 'demo')"
 
 ## 🧪 Testing
+Run tests on SMPC TCP ststem
+python test_smpc_tcp.py
+
 Run the quick test to verify everything works:
 python quick_test.py
 
