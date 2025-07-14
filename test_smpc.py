@@ -229,9 +229,10 @@ class TestSMPCSystem(unittest.TestCase):
         # Check computation status
         status = self.smpc.get_computation_status(self.computation_id)
         self.assertIsNotNone(status)
-        self.assertEqual(status['status'], 'completed')
-        self.assertEqual(status['final_sum'], expected_sum)
-    
+        if status:
+            self.assertEqual(status['status'], 'completed')
+            self.assertEqual(status['final_sum'], expected_sum)
+        
     def test_multiple_computations(self):
         """Test handling multiple computations simultaneously."""
         comp1_id = "comp1"
@@ -255,8 +256,9 @@ class TestSMPCSystem(unittest.TestCase):
         """Test getting party information."""
         party = self.smpc.get_party_info(1)
         self.assertIsNotNone(party)
-        self.assertEqual(party.id, 1)
-        self.assertEqual(party.name, "Party_1")
+        if party:
+            self.assertEqual(party.id, 1)
+            self.assertEqual(party.name, "Party_1")
         
         # Non-existent party
         party = self.smpc.get_party_info(999)
