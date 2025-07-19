@@ -18,14 +18,11 @@ class SMPCController:
             Party(i+1) for i in range(num_parties)
         ]
 
-    def submit_secret_values(self, user_values: List[int]) -> Dict[int, List[Share]]:
-        if len(user_values) != 2:
-            raise ValueError("Must provide exactly 2 secrets")
-
+    def create_shares_for_parties(self, secrets: List[int]) -> Dict[int, List[Share]]:
         all_shares: List[List[Share]] = []
 
         # Create named shares for each secret
-        for idx, secret in enumerate(user_values):
+        for idx, secret in enumerate(secrets):
             raw_shares = crypto.create_shares(secret, self.threshold, self.num_parties, prime=self.prime)
             named = [Share(share_val, party_id, idx+1) for (party_id, share_val) in raw_shares]
             all_shares.append(named)
@@ -33,12 +30,12 @@ class SMPCController:
         # Bundle shares per party
         party_share_map: Dict[int, List[Share]] = {}
         for i, party in enumerate(self.parties):
-            shares = [all_shares[0][i], all_shares[1][i]]
+            shares = [secret_shares[i] for secret_shares in all_shares]
             party_share_map[party.id] = shares
 
         return party_share_map
 
-    def compute_party_sums(self, party_share_map: Dict[int, List[Share]]) -> Dict[int, int]:
+    def request_party_sums(self, party_share_map: Dict[int, List[Share]]) -> Dict[int, int]:
         results = {}
         for party in self.parties:
             shares = party_share_map.get(party.id, [])
@@ -59,10 +56,10 @@ class SMPCController:
 
         return crypto.reconstruct_secret(selected_shares, prime=self.prime)
 
-    def run_secure_computation(self, value1: int, value2: int) -> int:
-        party_share_map = self.submit_secret_values([value1, value2])
-        partial_sums = self.compute_party_sums(party_share_map)
-        return self.reconstruct_final_sum(partial_sums)
+    def run_secure_computation(self, secrets: List[int]) -> int:
+        party_share_map = self.create_shares_for_parties(secrets)
+        sum_shares = self.request_party_sums(party_share_map)
+        return self.reconstruct_final_sum(sum_shares)
 
 
 def run_basic_functionality():
@@ -71,16 +68,16 @@ def run_basic_functionality():
     print("=" * 50)
 
     try:
-        secret1, secret2 = 100, 250
-        expected_sum = secret1 + secret2
+        secrets = [100, 250, 40]
+        expected_sum = sum(secrets)
 
         smpc = SMPCController(num_parties=3, threshold=2)
 
-        print(f"\nTesting with secrets: {secret1}, {secret2}")
+        print(f"\nTesting with secrets: {secrets}")
         print(f"   Expected sum: {expected_sum}")
 
         print("\n1. Creating shares and assigning to parties...")
-        share_map = smpc.submit_secret_values([secret1, secret2])
+        share_map = smpc.create_shares_for_parties(secrets)
         print("   Created shares.")
 
         print("\n2. Share distribution:")
@@ -88,13 +85,13 @@ def run_basic_functionality():
             names = [s.name for s in shares]
             print(f"   Party {party_id}: {names}")
 
-        print("\n3. Computing party sums...")
-        partials = smpc.compute_party_sums(share_map)
-        for pid, val in partials.items():
+        print("\n3. Requesting party sums...")
+        sum_shares = smpc.request_party_sums(share_map)
+        for pid, val in sum_shares.items():
             print(f"   Party {pid}: {str(val)[:5]}...")
 
         print("\n4. Reconstructing final sum...")
-        result = smpc.reconstruct_final_sum(partials)
+        result = smpc.reconstruct_final_sum(sum_shares)
         print(f"   Final result: {result}")
 
         if result == expected_sum:

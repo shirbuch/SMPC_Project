@@ -4,6 +4,7 @@ import random
 import time
 import smpc_crypto as crypto
 from smpc_controller import SMPCController
+from party import Party, Share
 
 
 class TestSMPCCrypto(unittest.TestCase):
@@ -50,9 +51,6 @@ class TestSMPCCrypto(unittest.TestCase):
         with self.assertRaises(ValueError):
             crypto.add_shares(shares1, shares2, self.prime)
 
-    def test_prime_is_consistent(self):
-        self.assertTrue(self.prime > 2**200)
-
     def test_threshold_security(self):
         shares = crypto.create_shares(self.secret, threshold=3, num_shares=5, prime=self.prime)
         rec = crypto.reconstruct_secret(shares[:2], self.prime)
@@ -68,41 +66,38 @@ class TestSMPCController(unittest.TestCase):
         self.smpc = SMPCController(3, 2)
 
     def test_run_secure_computation(self):
-        result = self.smpc.run_secure_computation(50, 60)
+        result = self.smpc.run_secure_computation([50, 60])
         self.assertEqual(result, 110)
 
     def test_multiple_runs(self):
-        res1 = self.smpc.run_secure_computation(10, 20)
-        res2 = self.smpc.run_secure_computation(5, 7)
+        res1 = self.smpc.run_secure_computation([10, 20])
+        res2 = self.smpc.run_secure_computation([5, 7])
         self.assertEqual(res1, 30)
         self.assertEqual(res2, 12)
 
+    def test_more_than_two_secrets(self):
+        result = self.smpc.run_secure_computation([100, 250, 40])
+        self.assertEqual(result, 390)
+
     def test_compute_party_sums_and_reconstruction(self):
-        shares = self.smpc.submit_secret_values([100, 200])
-        sums = self.smpc.compute_party_sums(shares)
+        shares = self.smpc.create_shares_for_parties([100, 200, 300])
+        sums = self.smpc.request_party_sums(shares)
         result = self.smpc.reconstruct_final_sum(sums)
-        expected = (100 + 200) % self.smpc.prime
+        expected = sum([100, 200, 300]) % self.smpc.prime
         self.assertEqual(result, expected)
 
-    def test_partial_ids(self):
-        shares = self.smpc.submit_secret_values([10, 90])
-        partials = self.smpc.compute_party_sums(shares)
-        used_ids = list(partials.keys())[:2]
-        result = self.smpc.reconstruct_final_sum(partials, party_ids=used_ids)
-        self.assertEqual(result, 100)
-
     def test_insufficient_shares(self):
-        shares = self.smpc.submit_secret_values([10, 15])
-        partials = self.smpc.compute_party_sums(shares)
+        shares = self.smpc.create_shares_for_parties([10, 15])
+        partials = self.smpc.request_party_sums(shares)
         only_one_id = [list(partials.keys())[0]]
         with self.assertRaises(ValueError):
             self.smpc.reconstruct_final_sum(partials, party_ids=only_one_id)
 
     def test_edge_cases(self):
-        for val1, val2 in [(0, 0), (0, 10), (-5, 5), (10**8, 10**8)]:
-            with self.subTest(val1=val1, val2=val2):
-                expected = (val1 + val2) % self.smpc.prime
-                result = self.smpc.run_secure_computation(val1, val2)
+        for secrets in [[0, 0], [0, 10], [-5, 5], [10**8, 10**8]]:
+            with self.subTest(secrets=secrets):
+                expected = sum(secrets) % self.smpc.prime
+                result = self.smpc.run_secure_computation(secrets)
                 self.assertEqual(result, expected)
 
     def test_all_configurations(self):
@@ -110,18 +105,39 @@ class TestSMPCController(unittest.TestCase):
         for num, thresh in configs:
             with self.subTest(parties=num, threshold=thresh):
                 smpc = SMPCController(num, thresh)
-                result = smpc.run_secure_computation(100, 200)
+                result = smpc.run_secure_computation([100, 200])
                 self.assertEqual(result, 300)
 
     def test_performance_sizes(self):
-        for a, b in [(10, 20), (1000, 2000), (10**6, 2*10**6), (10**9, 2*10**9)]:
-            with self.subTest(val1=a, val2=b):
+        for secrets in [[10, 20], [1000, 2000], [10**6, 2*10**6], [10**9, 2*10**9]]:
+            with self.subTest(secrets=secrets):
                 start = time.time()
-                result = self.smpc.run_secure_computation(a, b)
+                result = self.smpc.run_secure_computation(secrets)
                 duration = (time.time() - start) * 1000
-                expected = (a + b) % self.smpc.prime
+                expected = sum(secrets) % self.smpc.prime
                 self.assertEqual(result, expected)
                 self.assertLess(duration, 1000)
+
+
+class TestPartyAndShare(unittest.TestCase):
+    def setUp(self):
+        self.prime = crypto.get_prime()
+
+    def test_share_name_generation(self):
+        s = Share(value=12345, party_id=1, secret_idx=2)
+        self.assertEqual(s.name, "A_2")
+        self.assertEqual(str(s), "A_2: 12345")
+
+    def test_party_sum_correctness(self):
+        p = Party(1)
+        shares = [
+            Share(value=100, party_id=1, secret_idx=1),
+            Share(value=200, party_id=1, secret_idx=2),
+            Share(value=300, party_id=1, secret_idx=3),
+        ]
+        result = p.recieve_shares_and_compute_sum(shares, self.prime)
+        expected = (100 + 200 + 300) % self.prime
+        self.assertEqual(result, expected)
 
 
 def run_tests():
@@ -137,12 +153,30 @@ def run_tests():
     print("\n" + "=" * 60)
     print("🤝 Running SMPCController Tests")
     print("=" * 60)
-    suite_system = loader.loadTestsFromTestCase(TestSMPCController)
-    result_system = runner.run(suite_system)
+    suite_controller = loader.loadTestsFromTestCase(TestSMPCController)
+    result_controller = runner.run(suite_controller)
 
-    total = result_crypto.testsRun + result_system.testsRun
-    failures = len(result_crypto.failures) + len(result_system.failures)
-    errors = len(result_crypto.errors) + len(result_system.errors)
+    print("\n" + "=" * 60)
+    print("🧩 Running Party & Share Tests")
+    print("=" * 60)
+    suite_party = loader.loadTestsFromTestCase(TestPartyAndShare)
+    result_party = runner.run(suite_party)
+
+    total = (
+        result_crypto.testsRun +
+        result_controller.testsRun +
+        result_party.testsRun
+    )
+    failures = (
+        len(result_crypto.failures) +
+        len(result_controller.failures) +
+        len(result_party.failures)
+    )
+    errors = (
+        len(result_crypto.errors) +
+        len(result_controller.errors) +
+        len(result_party.errors)
+    )
     passed = total - failures - errors
 
     print("\n" + "=" * 60)

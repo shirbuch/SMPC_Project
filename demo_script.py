@@ -48,7 +48,7 @@ def demonstrate_basic_workflow():
     print(f"   Prime field size: {smpc.prime.bit_length()} bits")
 
     print_step(2, "Creating Secret Shares", "Splitting secrets using Shamir's Secret Sharing")
-    success = smpc.submit_secret_values([secret1, secret2], "demo")
+    success = smpc.create_shares_for_parties([secret1, secret2], "demo")
     if not success:
         print("❌ Failed to create shares!")
         return
@@ -62,7 +62,7 @@ def demonstrate_basic_workflow():
 
     print_step(3, "Computing Party Sums", "Each party sums their shares locally")
     print("   🔢 Local computations:")
-    smpc.compute_party_sums("demo")
+    smpc.request_party_sums("demo")
 
     print_step(4, "Reconstructing Final Sum", "Using Lagrange interpolation")
     final_result = smpc.reconstruct_final_sum("demo")
