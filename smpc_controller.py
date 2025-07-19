@@ -1,6 +1,7 @@
 from typing import List, Dict, Optional
 from party import Party, Share
 import smpc_crypto as crypto
+from dataclasses import dataclass
 
 
 class SMPCController:
@@ -14,7 +15,7 @@ class SMPCController:
         self.threshold = threshold
         self.prime = crypto.get_prime()
         self.parties: List[Party] = [
-            Party(id=i + 1, name=f"Party_{i + 1}") for i in range(num_parties)
+            Party(i+1) for i in range(num_parties)
         ]
 
     def submit_secret_values(self, user_values: List[int]) -> Dict[int, List[Share]]:
@@ -23,16 +24,10 @@ class SMPCController:
 
         all_shares: List[List[Share]] = []
 
+        # Create named shares for each secret
         for idx, secret in enumerate(user_values):
             raw_shares = crypto.create_shares(secret, self.threshold, self.num_parties, prime=self.prime)
-            named = [
-                Share(
-                    name=f"{idx + 1}_{chr(64 + party_id)}",  # 1 → A, etc.
-                    value=share_val,
-                    party_id=party_id
-                )
-                for (party_id, share_val) in raw_shares
-            ]
+            named = [Share(share_val, party_id, idx+1) for (party_id, share_val) in raw_shares]
             all_shares.append(named)
 
         # Bundle shares per party
