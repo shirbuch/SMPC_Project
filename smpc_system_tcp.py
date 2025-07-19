@@ -1,6 +1,7 @@
-from smpc_crypto import SMPCCrypto
+# smpc_system_tcp.py
+from smpc_system import SMPCSystem
 from comm_layer import send_data, receive_data
-from typing import List, Dict
+from typing import List, Dict, Tuple
 import threading
 import time
 
@@ -10,31 +11,29 @@ def _short(val: int) -> str:
 
 class SMPCSystemTCP:
     def __init__(self, num_parties: int = 3, threshold: int = 2):
-        self.num_parties = num_parties
-        self.threshold = threshold
-        self.crypto = SMPCCrypto()
-        self.party_hosts = [("localhost", 8000 + i + 1) for i in range(num_parties)]
+        self.smpc = SMPCSystem(num_parties=num_parties, threshold=threshold)
+        self.party_hosts: List[Tuple[str, int]] = [("localhost", 8000 + i + 1) for i in range(num_parties)]
         self.party_sums: Dict[int, int] = {}
         self.computation_id = "default"
 
-    def distribute_shares(self, values: List[int], computation_id: str = "default") -> None:
-        all_shares = []
-        for secret in values:
-            shares = self.crypto.create_shares(secret, self.threshold, self.num_parties)
-            print(f"[SMPC Controller] Created shares for secret {secret}:")
-            for pid, val in shares:
-                print(f"   Party {pid}: {_short(val)}")
-            all_shares.append(shares)
+    def start_listener(self):
+        thread = threading.Thread(target=receive_data, args=('0.0.0.0', 9000, self.receive_party_sum), daemon=True)
+        thread.start()
 
-        for i, (host, port) in enumerate(self.party_hosts):
-            shares_to_send = [(f"{j+1}_P{i+1}", all_shares[j][i][1]) for j in range(len(values))]
-            print(f"[SMPC Controller] Sending to Party {i+1} at {host}:{port}:")
-            for name, val in shares_to_send:
-                print(f"   {name}: {_short(val)}")
+    def distribute_shares(self, values: List[int], computation_id: str = "default") -> None:
+        print(f"[SMPC Controller] Creating shares using core logic...")
+        success = self.smpc.submit_secret_values(values, computation_id)
+        if not success:
+            raise RuntimeError("Failed to submit secret values")
+
+        for party, (host, port) in zip(self.smpc.parties, self.party_hosts):
+            shares = party.shares[computation_id]
+            serialized = [(share.name, share.value) for share in shares]
+            print(f"[SMPC Controller] Sending to {party.name} at {host}:{port}: {[s[0] for s in serialized]}")
             send_data(host, port, {
                 'action': 'store_shares',
                 'computation_id': computation_id,
-                'shares': shares_to_send
+                'shares': serialized
             })
 
     def trigger_local_sums(self, computation_id: str = "default") -> None:
@@ -53,18 +52,14 @@ class SMPCSystemTCP:
         self.party_sums[pid] = data['sum']
         print(f"[SMPC Controller] Received sum from Party {pid}: {_short(data['sum'])}")
 
-    def start_listener(self):
-        thread = threading.Thread(target=receive_data, args=('0.0.0.0', 9000, self.receive_party_sum), daemon=True)
-        thread.start()
-
     def reconstruct_sum(self):
-        if len(self.party_sums) < self.threshold:
+        if len(self.party_sums) < self.smpc.threshold:
             raise ValueError("Not enough party sums to reconstruct")
-        shares = [(pid, val) for pid, val in self.party_sums.items()]#[:self.threshold] # Reconstruct by only threshold
-        print(f"[SMPC Controller] Reconstructing from:")
+        shares = [(pid, val) for pid, val in sorted(self.party_sums.items())[:self.smpc.threshold]]
+        print("[SMPC Controller] Reconstructing using shares:")
         for pid, val in shares:
             print(f"   Party {pid}: {_short(val)}")
-        return self.crypto.reconstruct_secret(shares)
+        return self.smpc.crypto.reconstruct_secret(shares)
 
     def run(self, values: List[int], computation_id: str = "default") -> int:
         print("[SMPC Controller] Starting computation")
@@ -77,11 +72,11 @@ class SMPCSystemTCP:
         self.trigger_local_sums(computation_id)
 
         print("[SMPC Controller] Waiting for results...")
-        while len(self.party_sums) < self.threshold:
+        while len(self.party_sums) < self.smpc.threshold:
             time.sleep(0.2)
 
         final_sum = self.reconstruct_sum()
-        expected = sum(values) % self.crypto.get_prime()
+        expected = sum(values) % self.smpc.crypto.get_prime()
         print(f"[SMPC Controller] Final result: {_short(final_sum)}")
         print(f"[SMPC Controller] Expected result: {_short(expected)}")
         print("✅ SUCCESS" if final_sum == expected else "❌ MISMATCH")

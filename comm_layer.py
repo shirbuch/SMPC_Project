@@ -16,7 +16,7 @@ def receive_data(host: str, port: int, handler_fn: Callable[[Any], None]) -> Non
         s.listen()
         print(f"[COMM] Listening on {host}:{port}...")
         while True:
-            conn, addr = s.accept()
+            conn, _ = s.accept()
             with conn:
                 data = b""
                 while True:
@@ -28,4 +28,4 @@ def receive_data(host: str, port: int, handler_fn: Callable[[Any], None]) -> Non
                     obj = pickle.loads(data)
                     handler_fn(obj)
                 except Exception as e:
-                    print(f"[COMM] Error: {e}")
+                    print(f"[COMM] Error handling data: {e}")
