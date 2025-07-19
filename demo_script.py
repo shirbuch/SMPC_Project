@@ -8,6 +8,7 @@ import time
 from smpc_controller import SMPCController
 import smpc_crypto as crypto
 
+
 def print_banner():
     banner = """
     ╔══════════════════════════════════════════════════════════════╗
@@ -25,9 +26,9 @@ def print_step(step_num: int, description: str, details: str = ""):
     time.sleep(0.5)
 
 def demonstrate_basic_workflow():
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("📊 BASIC SMPC WORKFLOW DEMONSTRATION")
-    print("="*60)
+    print("=" * 60)
 
     try:
         print("\nEnter two secret numbers to compute their sum securely:")
@@ -48,28 +49,27 @@ def demonstrate_basic_workflow():
     print(f"   Prime field size: {smpc.prime.bit_length()} bits")
 
     print_step(2, "Creating Secret Shares", "Splitting secrets using Shamir's Secret Sharing")
-    success = smpc.create_shares_for_parties([secret1, secret2], "demo")
-    if not success:
-        print("❌ Failed to create shares!")
-        return
+    share_map = smpc.create_shares_for_parties([secret1, secret2])
 
     print("   📤 Share distribution:")
     for party in smpc.parties:
-        shares = party.shares["demo"]
-        print(f"   {party.name}: {[share.name for share in shares]}")
+        shares = share_map[party.id]
+        print(f"   {party.get_name()}: {[share.name for share in shares]}")
         for share in shares:
             print(f"   │  └─ {share}")
 
     print_step(3, "Computing Party Sums", "Each party sums their shares locally")
     print("   🔢 Local computations:")
-    smpc.request_party_sums("demo")
+    partial_results = smpc.request_parties_to_compute_results(share_map)
+    for pid, val in partial_results.items():
+        print(f"   Party {pid}: {str(val)[:5]}...")
 
     print_step(4, "Reconstructing Final Sum", "Using Lagrange interpolation")
-    final_result = smpc.reconstruct_final_sum("demo")
+    final_result = smpc.reconstruct_final_result(partial_results)
 
-    print("\n" + "="*40)
+    print("\n" + "=" * 40)
     print("🎉 COMPUTATION COMPLETE!")
-    print("="*40)
+    print("=" * 40)
     print(f"🔒 Input secrets: {secret1}, {secret2}")
     print(f"✅ Secure result: {final_result}")
     print(f"🎯 Expected sum: {secret1 + secret2}")
@@ -82,9 +82,9 @@ def demonstrate_basic_workflow():
     print(f"\n🛡️  Privacy guarantee: No party learned the individual secrets!")
 
 def demonstrate_security_properties():
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("🔐 SECURITY PROPERTIES DEMONSTRATION")
-    print("="*60)
+    print("=" * 60)
 
     secret = 12345
     prime = crypto.get_prime()
@@ -113,9 +113,9 @@ def demonstrate_security_properties():
     print(f"   Result: {r} \n{'✅ CORRECT' if r == secret else '❌ INCORRECT'}")
 
 def demonstrate_different_configurations():
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("⚙️  DIFFERENT CONFIGURATION DEMONSTRATION")
-    print("="*60)
+    print("=" * 60)
 
     configurations = [
         (3, 2, "Standard Setup"),
@@ -133,15 +133,15 @@ def demonstrate_different_configurations():
 
         try:
             smpc = SMPCController(num_parties, threshold)
-            cid = f"config_{num_parties}_{threshold}"
-            result = smpc.run_secure_computation(test_values[0], test_values[1], cid)
+            share_map = smpc.create_shares_for_parties(test_values)
+            partial_results = smpc.request_parties_to_compute_results(share_map)
 
             print("   Valid reconstructions:")
             for i in range(threshold, num_parties + 1):
                 subset = smpc.parties[i - threshold:i]
                 ids = [p.id for p in subset]
                 try:
-                    r = smpc.reconstruct_final_sum(cid, party_ids=ids)
+                    r = smpc.reconstruct_final_result(partial_results, party_ids=ids)
                     ok = "✓" if r == expected_sum else "✗"
                     print(f"     From parties {ids}: {r} ({ok})")
                 except Exception as e:
@@ -151,14 +151,14 @@ def demonstrate_different_configurations():
             bad_subset = smpc.parties[:threshold - 1]
             ids = [p.id for p in bad_subset]
             try:
-                smpc.reconstruct_final_sum(cid, party_ids=ids)
+                smpc.reconstruct_final_result(partial_results, party_ids=ids)
                 print(f"     From parties {ids}: Unexpected success! (✗)")
                 status = "❌ FAIL"
             except Exception:
                 print(f"     From parties {ids}: Failed as expected (✓)")
-                status = "✅ SUCCESS" if result == expected_sum else "❌ FAIL"
+                status = "✅ SUCCESS" if sum(test_values) % smpc.prime == expected_sum else "❌ FAIL"
 
-            summary.append((f"{desc} ({num_parties}P-{threshold}T)", result, status))
+            summary.append((f"{desc} ({num_parties}P-{threshold}T)", expected_sum, status))
             print(f"   {status}")
 
         except Exception as e:
@@ -192,7 +192,7 @@ def performance_benchmark():
     for val1, val2, description in test_cases:
         start_time = time.time()
         try:
-            result = smpc.run_secure_computation(val1, val2, f"perf_{val1}")
+            result = smpc.run_secure_computation([val1, val2])
             end_time = time.time()
 
             duration_ms = (end_time - start_time) * 1000

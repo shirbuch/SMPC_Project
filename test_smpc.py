@@ -79,19 +79,19 @@ class TestSMPCController(unittest.TestCase):
         result = self.smpc.run_secure_computation([100, 250, 40])
         self.assertEqual(result, 390)
 
-    def test_compute_party_sums_and_reconstruction(self):
+    def test_compute_partial_results_and_reconstruction(self):
         shares = self.smpc.create_shares_for_parties([100, 200, 300])
-        sums = self.smpc.request_party_sums(shares)
-        result = self.smpc.reconstruct_final_sum(sums)
+        results = self.smpc.request_parties_to_compute_results(shares)
+        result = self.smpc.reconstruct_final_result(results)
         expected = sum([100, 200, 300]) % self.smpc.prime
         self.assertEqual(result, expected)
 
     def test_insufficient_shares(self):
         shares = self.smpc.create_shares_for_parties([10, 15])
-        partials = self.smpc.request_party_sums(shares)
+        partials = self.smpc.request_parties_to_compute_results(shares)
         only_one_id = [list(partials.keys())[0]]
         with self.assertRaises(ValueError):
-            self.smpc.reconstruct_final_sum(partials, party_ids=only_one_id)
+            self.smpc.reconstruct_final_result(partials, party_ids=only_one_id)
 
     def test_edge_cases(self):
         for secrets in [[0, 0], [0, 10], [-5, 5], [10**8, 10**8]]:
@@ -128,14 +128,14 @@ class TestPartyAndShare(unittest.TestCase):
         self.assertEqual(s.name, "A_2")
         self.assertEqual(str(s), "A_2: 12345")
 
-    def test_party_sum_correctness(self):
+    def test_partial_result_correctness(self):
         p = Party(1)
         shares = [
             Share(value=100, party_id=1, secret_idx=1),
             Share(value=200, party_id=1, secret_idx=2),
             Share(value=300, party_id=1, secret_idx=3),
         ]
-        result = p.recieve_shares_and_compute_sum(shares, self.prime)
+        result = p.compute_sum(shares, self.prime)
         expected = (100 + 200 + 300) % self.prime
         self.assertEqual(result, expected)
 
