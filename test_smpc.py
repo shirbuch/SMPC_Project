@@ -3,7 +3,7 @@ import unittest
 import random
 import time
 import smpc_crypto as crypto
-from smpc_system import SMPCSystem
+from smpc_controller import SMPCController
 
 class TestSMPCCrypto(unittest.TestCase):
     def setUp(self):
@@ -63,12 +63,12 @@ class TestSMPCCrypto(unittest.TestCase):
 
 class TestSMPCSystem(unittest.TestCase):
     def setUp(self):
-        self.smpc = SMPCSystem(3, 2)
+        self.smpc = SMPCController(3, 2)
         self.cid = "cid"
 
     def test_init_invalid_threshold(self):
         with self.assertRaises(ValueError):
-            SMPCSystem(2, 3)
+            SMPCController(2, 3)
 
     def test_submit_valid_values(self):
         self.assertTrue(self.smpc.submit_secret_values([10, 20], self.cid))
@@ -155,7 +155,7 @@ class TestSMPCSystem(unittest.TestCase):
         configs = [(3, 2), (4, 2), (5, 3), (4, 4)]
         for num, thresh in configs:
             with self.subTest(parties=num, threshold=thresh):
-                smpc = SMPCSystem(num, thresh)
+                smpc = SMPCController(num, thresh)
                 expected = 300
                 result = smpc.run_secure_computation(100, 200, f"conf_{num}_{thresh}")
                 self.assertEqual(result, expected)

@@ -1,44 +1,9 @@
-# smpc_system.py
-
-from typing import List, Tuple, Dict, Optional
-from dataclasses import dataclass, field
+from typing import List, Dict, Optional
+from party import Party, Share
 import smpc_crypto as crypto
 
-@dataclass
-class Share:
-    """Represents a single share assigned to a party."""
-    name: str
-    value: int
-    party_id: int
-
-    def short(self) -> str:
-        s = str(self.value)
-        return s[:5] + "..." if len(s) > 5 else s
-
-    def __str__(self) -> str:
-        return f"{self.name}: {self.short()}"
-
-@dataclass
-class Party:
-    """Represents a party in the SMPC protocol."""
-    id: int
-    name: str
-    shares: Dict[str, List[Share]] = field(default_factory=dict)
-    local_sum_shares: Dict[str, Share] = field(default_factory=dict)
-
-    def receive_shares(self, computation_id: str, shares: List[Share]):
-        self.shares[computation_id] = shares
-
-    def compute_and_store_local_sum(self, computation_id: str, prime: int):
-        if computation_id not in self.shares:
-            raise ValueError(f"{self.name} missing shares for '{computation_id}'")
-        total = sum(share.value for share in self.shares[computation_id]) % prime
-        letter = chr(64 + self.id)  # 1 → A, 2 → B, ...
-        share = Share(name=f"sum_{letter}", value=total, party_id=self.id)
-        self.local_sum_shares[computation_id] = share
-
-class SMPCSystem:
-    """Secure Multi-Party Computation System using Shamir's Secret Sharing."""
+class SMPCController:
+    """Secure Multi-Party Computation Controller using Shamir's Secret Sharing."""
 
     def __init__(self, num_parties: int = 3, threshold: int = 2):
         if threshold > num_parties:
@@ -134,7 +99,7 @@ def run_basic_functionality():
         secret1, secret2 = 100, 250
         expected_sum = secret1 + secret2
 
-        smpc = SMPCSystem(num_parties=3, threshold=2)
+        smpc = SMPCController(num_parties=3, threshold=2)
 
         print(f"\nTesting with secrets: {secret1}, {secret2}")
         print(f"   Expected sum: {expected_sum}")

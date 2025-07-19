@@ -5,7 +5,7 @@ Interactive Demo Script for SMPC Collaborative Data Analysis
 
 import sys
 import time
-from smpc_system import SMPCSystem
+from smpc_controller import SMPCController
 import smpc_crypto as crypto
 
 def print_banner():
@@ -41,7 +41,7 @@ def demonstrate_basic_workflow():
     print(f"🎯 Expected sum: {secret1 + secret2}")
 
     print_step(1, "Initializing SMPC System", "Creating 3 parties with threshold 2")
-    smpc = SMPCSystem(num_parties=3, threshold=2)
+    smpc = SMPCController(num_parties=3, threshold=2)
 
     print(f"   Parties: {smpc.num_parties}")
     print(f"   Threshold: {smpc.threshold}")
@@ -132,7 +132,7 @@ def demonstrate_different_configurations():
         print(f"   Threshold: {threshold}")
 
         try:
-            smpc = SMPCSystem(num_parties, threshold)
+            smpc = SMPCController(num_parties, threshold)
             cid = f"config_{num_parties}_{threshold}"
             result = smpc.run_secure_computation(test_values[0], test_values[1], cid)
 
@@ -176,7 +176,7 @@ def performance_benchmark():
     print("⚡ PERFORMANCE BENCHMARK")
     print("="*60)
 
-    smpc = SMPCSystem(num_parties=3, threshold=2)
+    smpc = SMPCController(num_parties=3, threshold=2)
 
     test_cases = [
         (10, 20, "Small values"),
@@ -228,7 +228,7 @@ def interactive_menu():
             elif choice == "4":
                 performance_benchmark()
             elif choice == "5":
-                from smpc_system import run_basic_functionality
+                from smpc_controller import run_basic_functionality
                 run_basic_functionality()
             elif choice == "6":
                 print("\n🧪 Running comprehensive test suite...")
