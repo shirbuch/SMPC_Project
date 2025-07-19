@@ -3,7 +3,7 @@
 from typing import List, Tuple, Dict, Optional
 import logging
 from dataclasses import dataclass, field
-from smpc_crypto import SMPCCrypto
+import smpc_crypto as crypto
 
 @dataclass
 class Share:
@@ -28,11 +28,9 @@ class Party:
     local_sum_shares: Dict[str, Share] = field(default_factory=dict)
 
     def receive_shares(self, computation_id: str, shares: List[Share]):
-        """Store shares for a computation."""
         self.shares[computation_id] = shares
 
     def compute_and_store_local_sum(self, computation_id: str, prime: int):
-        """Compute and store local sum as a share."""
         if computation_id not in self.shares:
             raise ValueError(f"{self.name} missing shares for '{computation_id}'")
         total = sum(share.value for share in self.shares[computation_id]) % prime
@@ -49,7 +47,7 @@ class SMPCSystem:
 
         self.num_parties = num_parties
         self.threshold = threshold
-        self.crypto = SMPCCrypto()
+        self.prime = crypto.get_prime()
         self.parties: List[Party] = [
             Party(id=i+1, name=f"Party_{i+1}") for i in range(num_parties)
         ]
@@ -67,7 +65,7 @@ class SMPCSystem:
             all_shares: List[List[Share]] = []
 
             for idx, secret in enumerate(user_values):
-                raw_shares = self.crypto.create_shares(secret, self.threshold, self.num_parties)
+                raw_shares = crypto.create_shares(secret, self.threshold, self.num_parties, prime=self.prime)
                 named = [
                     Share(
                         name=f"{idx + 1}_{party_letters[i]}",
@@ -91,25 +89,14 @@ class SMPCSystem:
 
     def compute_party_sums(self, computation_id: str = "default") -> Dict[int, int]:
         results = {}
-        prime = self.crypto.get_prime()
         for party in self.parties:
-            party.compute_and_store_local_sum(computation_id, prime)
+            party.compute_and_store_local_sum(computation_id, self.prime)
             share = party.local_sum_shares[computation_id]
             self.logger.info(f"{party.name} computed local sum: {share.value}")
             results[party.id] = share.value
         return results
 
     def reconstruct_final_sum(self, computation_id: str = "default", party_ids: Optional[List[int]] = None) -> int:
-        """
-        Reconstruct the final sum from local computed shares.
-
-        Args:
-            computation_id: Computation identifier
-            party_ids: Optional list of party IDs to use for reconstruction
-
-        Returns:
-            final_sum: The securely reconstructed sum
-        """
         computed_share = []
 
         if party_ids is None:
@@ -126,7 +113,7 @@ class SMPCSystem:
         if len(computed_share) < self.threshold:
             raise ValueError(f"Insufficient shares: {len(computed_share)} provided, need {self.threshold}")
 
-        final_sum = self.crypto.reconstruct_secret(computed_share)
+        final_sum = crypto.reconstruct_secret(computed_share, prime=self.prime)
         self.logger.info(f"Reconstructed final sum: {final_sum} using parties {[p.id for p in selected_parties]}")
         return final_sum
 
@@ -139,7 +126,7 @@ class SMPCSystem:
         self.compute_party_sums(computation_id)
         result = self.reconstruct_final_sum(computation_id)
 
-        expected = (value1 + value2) % self.crypto.get_prime()
+        expected = (value1 + value2) % self.prime
         if result == expected:
             self.logger.info("✓ Computation correct")
         else:
@@ -156,26 +143,54 @@ class SMPCSystem:
             party.local_sum_shares.pop(computation_id, None)
         self.logger.info(f"Cleared computation '{computation_id}'")
 
-def main():
-    print("=== Secure Multi-Party Computation Demo ===")
-    smpc = SMPCSystem(num_parties=3, threshold=2)
-
-    secret1, secret2 = 100, 250
-    print(f"User's secrets: {secret1}, {secret2}")
-    print(f"Expected sum: {secret1 + secret2}\n")
+def run_basic_functionality():
+    logging.disable()
+    print("=" * 50)
+    print("======== SMPC System Basic Functionality =========")
+    print("=" * 50)
 
     try:
-        result = smpc.run_secure_computation(secret1, secret2)
-        print(f"Secure computation result: {result}\n")
+        secret1, secret2 = 100, 250
+        expected_sum = secret1 + secret2
 
+        smpc = SMPCSystem(num_parties=3, threshold=2)
+
+        print(f"\nTesting with secrets: {secret1}, {secret2}")
+        print(f"   Expected sum: {expected_sum}")
+
+        print("\n1. Submitting secrets and creating shares...")
+        success = smpc.submit_secret_values([secret1, secret2], "test")
+        if not success:
+            raise RuntimeError("Failed to submit secrets")
+        print("   ✅ Secrets submitted successfully")
+
+        print("\n2. Share distribution:")
         for party in smpc.parties:
-            shares = party.shares.get("default", [])
-            print(f"{party.name} shares:")
-            for share in shares:
-                print(f"  {share}")
+            shares = party.shares["test"]
+            share_names = [share.name for share in shares]
+            print(f"   {party.name}: {share_names}")
+
+        print("\n3. Computing party sums...")
+        smpc.compute_party_sums("test")
+        print("   ✅ Party sums computed successfully")
+
+        print("\n4. Reconstructing final sum...")
+        final_result = smpc.reconstruct_final_sum("test")
+        print(f"   Final result: {final_result}")
+
+        if final_result == expected_sum:
+            print("   ✅ SUCCESS: Computation result is correct!")
+            return True
+        else:
+            print(f"   ❌ FAILED: Expected {expected_sum}, got {final_result}")
+            return False
 
     except Exception as e:
-        print(f"Error during computation: {e}")
+        print(f"   ❌ ERROR: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
 
 if __name__ == "__main__":
-    main()
+    run_basic_functionality()

@@ -5,11 +5,11 @@ A Python implementation of Secure Multi-Party Computation using Shamir's Secret 
 ---
 
 ## ✅ Quick Run and Test
+Run the system:
+python smpc_system.py
+
 Run the full demo:
 python demo_script.py
-
-Run the quick test to simply see that the system works:
-python quick_test.py
 
 Run the full tests to verify everything works:
 python test_smpc.py

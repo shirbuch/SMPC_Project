@@ -5,10 +5,10 @@ Interactive Demo Script for SMPC Collaborative Data Analysis
 
 import sys
 import time
+import logging
 from typing import Optional
 from smpc_system import SMPCSystem
-from smpc_crypto import SMPCCrypto
-import logging
+import smpc_crypto as crypto
 
 # Disable system logs globally
 logging.getLogger("smpc_system").setLevel(logging.CRITICAL)
@@ -50,7 +50,7 @@ def demonstrate_basic_workflow():
 
     print(f"   Parties: {smpc.num_parties}")
     print(f"   Threshold: {smpc.threshold}")
-    print(f"   Prime field size: {smpc.crypto.get_prime().bit_length()} bits")
+    print(f"   Prime field size: {smpc.prime.bit_length()} bits")
 
     print_step(2, "Creating Secret Shares", "Splitting secrets using Shamir's Secret Sharing")
     success = smpc.submit_secret_values([secret1, secret2], "demo")
@@ -91,11 +91,11 @@ def demonstrate_security_properties():
     print("🔐 SECURITY PROPERTIES DEMONSTRATION")
     print("="*60)
 
-    crypto = SMPCCrypto()
     secret = 12345
+    prime = crypto.get_prime()
 
     print(f"\n🔒 Original secret: {secret}")
-    shares = crypto.create_shares(secret, threshold=3, num_shares=5)
+    shares = crypto.create_shares(secret, threshold=3, num_shares=5, prime=prime)
     print(f"\n📊 Generated {len(shares)} shares with threshold 3:")
     for party_id, share_value in shares:
         print(f"   Party {party_id}: {share_value}")
@@ -103,15 +103,18 @@ def demonstrate_security_properties():
     print(f"\n🔍 Threshold Security Demonstration:")
 
     print(f"\n❌ Trying to reconstruct with 2 shares (below threshold):")
-    r = crypto.reconstruct_secret(shares[:2])
-    print(f"   Result: {r} \n{'❌ Unexpected success' if r == secret else '✅ Properly failed'}")
+    try:
+        r = crypto.reconstruct_secret(shares[:2], prime=prime)
+        print(f"   Result: {r} \n{'❌ Unexpected success' if r == secret else '✅ Properly failed'}")
+    except Exception as e:
+        print(f"   ✅ Properly failed: {e}")
 
     print(f"\nReconstructing with 3 shares:")
-    r = crypto.reconstruct_secret(shares[:3])
+    r = crypto.reconstruct_secret(shares[:3], prime=prime)
     print(f"   Result: {r} \n{'✅ CORRECT' if r == secret else '❌ INCORRECT'}")
 
     print(f"\nReconstructing with 4 shares:")
-    r = crypto.reconstruct_secret(shares[:4])
+    r = crypto.reconstruct_secret(shares[:4], prime=prime)
     print(f"   Result: {r} \n{'✅ CORRECT' if r == secret else '❌ INCORRECT'}")
 
 def demonstrate_different_configurations():
@@ -174,42 +177,37 @@ def demonstrate_different_configurations():
         print(f"{config:<30} {str(result):<15} {status}")
 
 def performance_benchmark():
-    """Simple performance benchmark."""
     print("\n" + "="*60)
     print("⚡ PERFORMANCE BENCHMARK")
     print("="*60)
-    
-    import time
-    
+
     smpc = SMPCSystem(num_parties=3, threshold=2)
-    
-    # Benchmark different value sizes
+
     test_cases = [
         (10, 20, "Small values"),
         (1000, 2000, "Medium values"),
         (10**6, 2*10**6, "Large values"),
         (10**9, 2*10**9, "Very large values")
     ]
-    
+
     print(f"\n📊 Performance Results:")
     print(f"{'Test Case':<20} {'Time (ms)':<12} {'Result':<15} {'Status':<10}")
     print("-" * 60)
-    
+
     for val1, val2, description in test_cases:
         start_time = time.time()
         try:
             result = smpc.run_secure_computation(val1, val2, f"perf_{val1}")
             end_time = time.time()
-            
+
             duration_ms = (end_time - start_time) * 1000
-            expected = (val1 + val2) % smpc.crypto.get_prime()
+            expected = (val1 + val2) % smpc.prime
             status = "✅ OK" if result == expected else "❌ FAIL"
-            
+
             print(f"{description:<20} {duration_ms:<12.2f} {result:<15} {status:<10}")
-            
+
         except Exception as e:
             print(f"{description:<20} {'ERROR':<12} {'N/A':<15} {'❌ FAIL':<10}")
-
 
 def interactive_menu():
     while True:
@@ -220,7 +218,7 @@ def interactive_menu():
         print("2. 🔐 Security Properties Demo")
         print("3. ⚙️  Different Configurations")
         print("4. ⚡ Performance Benchmark")
-        print("5. 🧪 Run Quick Tests")
+        print("5. 🚀 Run Basic Functionality")
         print("6. 🧪 Run All Tests")
         print("7. ❌ Exit")
 
@@ -235,9 +233,8 @@ def interactive_menu():
             elif choice == "4":
                 performance_benchmark()
             elif choice == "5":
-                print("\n🧪 Running quick test suite...")
-                from quick_test import main as run_quick_tests
-                run_quick_tests()
+                from smpc_system import run_basic_functionality
+                run_basic_functionality()
             elif choice == "6":
                 print("\n🧪 Running comprehensive test suite...")
                 from test_smpc import run_tests

@@ -1,75 +1,68 @@
 #!/usr/bin/env python3
-"""
-Extended test suite for Secure Multi-Party Computation (SMPC).
-"""
-
 import unittest
 import random
 import logging
 import time
-from smpc_crypto import SMPCCrypto
+import smpc_crypto as crypto
 from smpc_system import SMPCSystem
 
 logging.getLogger("smpc_system").setLevel(logging.CRITICAL)
 
 class TestSMPCCrypto(unittest.TestCase):
     def setUp(self):
-        self.crypto = SMPCCrypto()
+        self.prime = crypto.get_prime()
         self.secret = 12345
         self.threshold = 3
         self.num_shares = 5
 
     def test_create_shares_valid(self):
-        shares = self.crypto.create_shares(self.secret, self.threshold, self.num_shares)
+        shares = crypto.create_shares(self.secret, self.threshold, self.num_shares, self.prime)
         self.assertEqual(len(shares), self.num_shares)
         self.assertEqual(len(set(x for x, _ in shares)), self.num_shares)
 
     def test_create_shares_invalid(self):
         with self.assertRaises(ValueError):
-            self.crypto.create_shares(42, 6, 5)
+            crypto.create_shares(42, 6, 5, self.prime)
 
     def test_reconstruct_secret_success(self):
-        shares = self.crypto.create_shares(self.secret, self.threshold, self.num_shares)
+        shares = crypto.create_shares(self.secret, self.threshold, self.num_shares, self.prime)
         random.shuffle(shares)
-        rec = self.crypto.reconstruct_secret(shares[:self.threshold])
+        rec = crypto.reconstruct_secret(shares[:self.threshold], self.prime)
         self.assertEqual(rec, self.secret)
 
     def test_reconstruct_secret_failure(self):
-        shares = self.crypto.create_shares(self.secret, self.threshold, self.num_shares)
+        shares = crypto.create_shares(self.secret, self.threshold, self.num_shares, self.prime)
         with self.assertRaises(ValueError):
-            self.crypto.reconstruct_secret(shares[:1])
+            crypto.reconstruct_secret(shares[:1], self.prime)
         with self.assertRaises(ValueError):
-            self.crypto.reconstruct_secret([])
+            crypto.reconstruct_secret([], self.prime)
 
     def test_add_shares_valid(self):
         s1, s2 = 100, 200
-        shares1 = self.crypto.create_shares(s1, self.threshold, self.num_shares)
-        shares2 = self.crypto.create_shares(s2, self.threshold, self.num_shares)
-        added = self.crypto.add_shares(shares1, shares2)
-        result = self.crypto.reconstruct_secret(added[:self.threshold])
-        expected = (s1 + s2) % self.crypto.get_prime()
+        shares1 = crypto.create_shares(s1, self.threshold, self.num_shares, self.prime)
+        shares2 = crypto.create_shares(s2, self.threshold, self.num_shares, self.prime)
+        added = crypto.add_shares(shares1, shares2, self.prime)
+        result = crypto.reconstruct_secret(added[:self.threshold], self.prime)
+        expected = (s1 + s2) % self.prime
         self.assertEqual(result, expected)
 
     def test_add_shares_mismatch(self):
-        shares1 = self.crypto.create_shares(100, 3, 5)
+        shares1 = crypto.create_shares(100, 3, 5, self.prime)
         shares2 = [(id + 1, val) for id, val in shares1]
         with self.assertRaises(ValueError):
-            self.crypto.add_shares(shares1, shares2)
+            crypto.add_shares(shares1, shares2, self.prime)
 
     def test_prime_is_consistent(self):
-        prime = self.crypto.get_prime()
-        self.assertTrue(prime > 2**200)
+        self.assertTrue(self.prime > 2**200)
 
     def test_threshold_security(self):
-        secret = 12345
-        shares = self.crypto.create_shares(secret, threshold=3, num_shares=5)
-        rec = self.crypto.reconstruct_secret(shares[:2]) # Below threshold
-        self.assertNotEqual(rec, secret)
-        rec = self.crypto.reconstruct_secret(shares[:3])
-        self.assertEqual(rec, secret)
-        rec = self.crypto.reconstruct_secret(shares[:4])
-        self.assertEqual(rec, secret)
-
+        shares = crypto.create_shares(self.secret, threshold=3, num_shares=5, prime=self.prime)
+        rec = crypto.reconstruct_secret(shares[:2], self.prime)
+        self.assertNotEqual(rec, self.secret)
+        rec = crypto.reconstruct_secret(shares[:3], self.prime)
+        self.assertEqual(rec, self.secret)
+        rec = crypto.reconstruct_secret(shares[:4], self.prime)
+        self.assertEqual(rec, self.secret)
 
 class TestSMPCSystem(unittest.TestCase):
     def setUp(self):
@@ -145,7 +138,7 @@ class TestSMPCSystem(unittest.TestCase):
             self.assertNotIn(self.cid, p.local_sum_shares)
 
     def test_reset_empty(self):
-        self.smpc.reset_computation("non_existent")  # should not raise
+        self.smpc.reset_computation("non_existent")
 
     def test_get_party_info(self):
         p1 = self.smpc.get_party_info(1)
@@ -157,7 +150,7 @@ class TestSMPCSystem(unittest.TestCase):
     def test_edge_cases(self):
         for val1, val2 in [(0, 0), (0, 10), (-5, 5), (10**8, 10**8)]:
             with self.subTest(v1=val1, v2=val2):
-                expected = (val1 + val2) % self.smpc.crypto.get_prime()
+                expected = (val1 + val2) % self.smpc.prime
                 result = self.smpc.run_secure_computation(val1, val2, f"case_{val1}_{val2}")
                 self.assertEqual(result, expected)
 
@@ -176,15 +169,14 @@ class TestSMPCSystem(unittest.TestCase):
                 start = time.time()
                 result = self.smpc.run_secure_computation(a, b, f"perf_{a}")
                 duration = (time.time() - start) * 1000
-                expected = (a + b) % self.smpc.crypto.get_prime()
+                expected = (a + b) % self.smpc.prime
                 self.assertEqual(result, expected)
-                self.assertLess(duration, 1000)  # rough benchmark
+                self.assertLess(duration, 1000)
 
     def test_reconstruction_without_computation(self):
         self.smpc.submit_secret_values([1, 2], self.cid)
         with self.assertRaises(ValueError):
             self.smpc.reconstruct_final_sum(self.cid)
-
 
 def run_tests():
     loader = unittest.TestLoader()
@@ -215,7 +207,6 @@ def run_tests():
     print("=" * 60)
 
     return failures == 0 and errors == 0
-
 
 if __name__ == "__main__":
     success = run_tests()
