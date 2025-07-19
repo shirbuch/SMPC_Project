@@ -5,13 +5,8 @@ Interactive Demo Script for SMPC Collaborative Data Analysis
 
 import sys
 import time
-import logging
-from typing import Optional
 from smpc_system import SMPCSystem
 import smpc_crypto as crypto
-
-# Disable system logs globally
-logging.getLogger("smpc_system").setLevel(logging.CRITICAL)
 
 def print_banner():
     banner = """

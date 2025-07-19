@@ -1,7 +1,6 @@
 # smpc_system.py
 
 from typing import List, Tuple, Dict, Optional
-import logging
 from dataclasses import dataclass, field
 import smpc_crypto as crypto
 
@@ -52,12 +51,8 @@ class SMPCSystem:
             Party(id=i+1, name=f"Party_{i+1}") for i in range(num_parties)
         ]
 
-        logging.basicConfig(level=logging.INFO)
-        self.logger = logging.getLogger(__name__)
-
     def submit_secret_values(self, user_values: List[int], computation_id: str = "default") -> bool:
         if len(user_values) != 2:
-            self.logger.error("Exactly 2 values must be provided")
             return False
 
         try:
@@ -79,12 +74,10 @@ class SMPCSystem:
             for i, party in enumerate(self.parties):
                 shares = [all_shares[0][i], all_shares[1][i]]
                 party.receive_shares(computation_id, shares)
-                self.logger.info(f"Distributed to {party.name}: {[str(s) for s in shares]}")
 
             return True
 
         except Exception as e:
-            self.logger.error(f"Error in submit_secret_values: {e}")
             return False
 
     def compute_party_sums(self, computation_id: str = "default") -> Dict[int, int]:
@@ -92,7 +85,6 @@ class SMPCSystem:
         for party in self.parties:
             party.compute_and_store_local_sum(computation_id, self.prime)
             share = party.local_sum_shares[computation_id]
-            self.logger.info(f"{party.name} computed local sum: {share.value}")
             results[party.id] = share.value
         return results
 
@@ -114,23 +106,14 @@ class SMPCSystem:
             raise ValueError(f"Insufficient shares: {len(computed_share)} provided, need {self.threshold}")
 
         final_sum = crypto.reconstruct_secret(computed_share, prime=self.prime)
-        self.logger.info(f"Reconstructed final sum: {final_sum} using parties {[p.id for p in selected_parties]}")
         return final_sum
 
     def run_secure_computation(self, value1: int, value2: int, computation_id: str = "default") -> int:
-        self.logger.info(f"Starting secure computation for '{computation_id}'")
-
         if not self.submit_secret_values([value1, value2], computation_id):
             raise RuntimeError("Failed to submit secret values")
 
         self.compute_party_sums(computation_id)
         result = self.reconstruct_final_sum(computation_id)
-
-        expected = (value1 + value2) % self.prime
-        if result == expected:
-            self.logger.info("✓ Computation correct")
-        else:
-            self.logger.error(f"✗ Computation incorrect: expected {expected}, got {result}")
 
         return result
 
@@ -141,10 +124,8 @@ class SMPCSystem:
         for party in self.parties:
             party.shares.pop(computation_id, None)
             party.local_sum_shares.pop(computation_id, None)
-        self.logger.info(f"Cleared computation '{computation_id}'")
 
 def run_basic_functionality():
-    logging.disable()
     print("=" * 50)
     print("======== SMPC System Basic Functionality =========")
     print("=" * 50)

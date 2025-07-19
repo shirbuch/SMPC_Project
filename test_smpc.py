@@ -1,12 +1,9 @@
 #!/usr/bin/env python3
 import unittest
 import random
-import logging
 import time
 import smpc_crypto as crypto
 from smpc_system import SMPCSystem
-
-logging.getLogger("smpc_system").setLevel(logging.CRITICAL)
 
 class TestSMPCCrypto(unittest.TestCase):
     def setUp(self):
