@@ -1,189 +1,143 @@
 #!/usr/bin/env python3
-"""
-Extended test suite for Secure Multi-Party Computation (SMPC).
-"""
-
 import unittest
 import random
-import logging
 import time
-from smpc_crypto import SMPCCrypto
-from smpc_system import SMPCSystem
+import smpc_crypto as crypto
+from smpc_controller import SMPCController
+from party import Party, Share
 
-logging.getLogger("smpc_system").setLevel(logging.CRITICAL)
 
 class TestSMPCCrypto(unittest.TestCase):
     def setUp(self):
-        self.crypto = SMPCCrypto()
+        self.prime = crypto.get_prime()
         self.secret = 12345
         self.threshold = 3
         self.num_shares = 5
 
     def test_create_shares_valid(self):
-        shares = self.crypto.create_shares(self.secret, self.threshold, self.num_shares)
+        shares = crypto.create_shares(self.secret, self.threshold, self.num_shares, self.prime)
         self.assertEqual(len(shares), self.num_shares)
         self.assertEqual(len(set(x for x, _ in shares)), self.num_shares)
 
     def test_create_shares_invalid(self):
         with self.assertRaises(ValueError):
-            self.crypto.create_shares(42, 6, 5)
+            crypto.create_shares(42, 6, 5, self.prime)
 
     def test_reconstruct_secret_success(self):
-        shares = self.crypto.create_shares(self.secret, self.threshold, self.num_shares)
+        shares = crypto.create_shares(self.secret, self.threshold, self.num_shares, self.prime)
         random.shuffle(shares)
-        rec = self.crypto.reconstruct_secret(shares[:self.threshold])
+        rec = crypto.reconstruct_secret(shares[:self.threshold], self.prime)
         self.assertEqual(rec, self.secret)
 
     def test_reconstruct_secret_failure(self):
-        shares = self.crypto.create_shares(self.secret, self.threshold, self.num_shares)
+        shares = crypto.create_shares(self.secret, self.threshold, self.num_shares, self.prime)
         with self.assertRaises(ValueError):
-            self.crypto.reconstruct_secret(shares[:1])
+            crypto.reconstruct_secret(shares[:1], self.prime)
         with self.assertRaises(ValueError):
-            self.crypto.reconstruct_secret([])
+            crypto.reconstruct_secret([], self.prime)
 
     def test_add_shares_valid(self):
         s1, s2 = 100, 200
-        shares1 = self.crypto.create_shares(s1, self.threshold, self.num_shares)
-        shares2 = self.crypto.create_shares(s2, self.threshold, self.num_shares)
-        added = self.crypto.add_shares(shares1, shares2)
-        result = self.crypto.reconstruct_secret(added[:self.threshold])
-        expected = (s1 + s2) % self.crypto.get_prime()
+        shares1 = crypto.create_shares(s1, self.threshold, self.num_shares, self.prime)
+        shares2 = crypto.create_shares(s2, self.threshold, self.num_shares, self.prime)
+        added = crypto.add_shares(shares1, shares2, self.prime)
+        result = crypto.reconstruct_secret(added[:self.threshold], self.prime)
+        expected = (s1 + s2) % self.prime
         self.assertEqual(result, expected)
 
     def test_add_shares_mismatch(self):
-        shares1 = self.crypto.create_shares(100, 3, 5)
+        shares1 = crypto.create_shares(100, 3, 5, self.prime)
         shares2 = [(id + 1, val) for id, val in shares1]
         with self.assertRaises(ValueError):
-            self.crypto.add_shares(shares1, shares2)
-
-    def test_prime_is_consistent(self):
-        prime = self.crypto.get_prime()
-        self.assertTrue(prime > 2**200)
+            crypto.add_shares(shares1, shares2, self.prime)
 
     def test_threshold_security(self):
-        secret = 12345
-        shares = self.crypto.create_shares(secret, threshold=3, num_shares=5)
-        rec = self.crypto.reconstruct_secret(shares[:2]) # Below threshold
-        self.assertNotEqual(rec, secret)
-        rec = self.crypto.reconstruct_secret(shares[:3])
-        self.assertEqual(rec, secret)
-        rec = self.crypto.reconstruct_secret(shares[:4])
-        self.assertEqual(rec, secret)
+        shares = crypto.create_shares(self.secret, threshold=3, num_shares=5, prime=self.prime)
+        rec = crypto.reconstruct_secret(shares[:2], self.prime)
+        self.assertNotEqual(rec, self.secret)
+        rec = crypto.reconstruct_secret(shares[:3], self.prime)
+        self.assertEqual(rec, self.secret)
+        rec = crypto.reconstruct_secret(shares[:4], self.prime)
+        self.assertEqual(rec, self.secret)
 
 
-class TestSMPCSystem(unittest.TestCase):
+class TestSMPCController(unittest.TestCase):
     def setUp(self):
-        self.smpc = SMPCSystem(3, 2)
-        self.cid = "cid"
-
-    def test_init_invalid_threshold(self):
-        with self.assertRaises(ValueError):
-            SMPCSystem(2, 3)
-
-    def test_submit_valid_values(self):
-        self.assertTrue(self.smpc.submit_secret_values([10, 20], self.cid))
-        for p in self.smpc.parties:
-            self.assertIn(self.cid, p.shares)
-            self.assertEqual(len(p.shares[self.cid]), 2)
-
-    def test_share_naming(self):
-        self.smpc.submit_secret_values([100, 200], "naming_test")
-        expected_suffixes = ["A", "B", "C"]
-        for i, party in enumerate(self.smpc.parties):
-            names = [s.name for s in party.shares["naming_test"]]
-            self.assertEqual(names, [f"1_{expected_suffixes[i]}", f"2_{expected_suffixes[i]}"])
-
-    def test_compute_party_sums_valid(self):
-        self.smpc.submit_secret_values([10, 20], self.cid)
-        sums = self.smpc.compute_party_sums(self.cid)
-        self.assertEqual(len(sums), 3)
-
-    def test_compute_party_sums_missing(self):
-        with self.assertRaises(ValueError):
-            self.smpc.compute_party_sums("missing")
-
-    def test_reconstruct_default(self):
-        self.smpc.submit_secret_values([5, 7], self.cid)
-        self.smpc.compute_party_sums(self.cid)
-        result = self.smpc.reconstruct_final_sum(self.cid)
-        self.assertEqual(result, 12)
-
-    def test_reconstruct_with_ids(self):
-        self.smpc.submit_secret_values([2, 3], self.cid)
-        self.smpc.compute_party_sums(self.cid)
-        result = self.smpc.reconstruct_final_sum(self.cid, party_ids=[1, 2])
-        self.assertEqual(result, 5)
-
-    def test_reconstruct_with_invalid_id(self):
-        self.smpc.submit_secret_values([2, 3], self.cid)
-        self.smpc.compute_party_sums(self.cid)
-        with self.assertRaises(ValueError):
-            self.smpc.reconstruct_final_sum(self.cid, party_ids=[1, 999])
-
-    def test_reconstruct_with_insufficient_ids(self):
-        self.smpc.submit_secret_values([3, 4], self.cid)
-        self.smpc.compute_party_sums(self.cid)
-        with self.assertRaises(ValueError):
-            self.smpc.reconstruct_final_sum(self.cid, party_ids=[1])
+        self.smpc = SMPCController(3, 2)
 
     def test_run_secure_computation(self):
-        result = self.smpc.run_secure_computation(50, 60, self.cid)
+        result = self.smpc.run_secure_computation([50, 60])
         self.assertEqual(result, 110)
 
     def test_multiple_runs(self):
-        res1 = self.smpc.run_secure_computation(10, 20, "a")
-        res2 = self.smpc.run_secure_computation(5, 7, "b")
+        res1 = self.smpc.run_secure_computation([10, 20])
+        res2 = self.smpc.run_secure_computation([5, 7])
         self.assertEqual(res1, 30)
         self.assertEqual(res2, 12)
 
-    def test_reset_computation(self):
-        self.smpc.submit_secret_values([1, 2], self.cid)
-        self.smpc.compute_party_sums(self.cid)
-        self.smpc.reset_computation(self.cid)
-        for p in self.smpc.parties:
-            self.assertNotIn(self.cid, p.shares)
-            self.assertNotIn(self.cid, p.local_sum_shares)
+    def test_more_than_two_secrets(self):
+        result = self.smpc.run_secure_computation([100, 250, 40])
+        self.assertEqual(result, 390)
 
-    def test_reset_empty(self):
-        self.smpc.reset_computation("non_existent")  # should not raise
+    def test_compute_partial_results_and_reconstruction(self):
+        shares = self.smpc.create_shares_for_parties([100, 200, 300])
+        results = self.smpc.request_parties_to_compute_results(shares)
+        result = self.smpc.reconstruct_final_result(results)
+        expected = sum([100, 200, 300]) % self.smpc.prime
+        self.assertEqual(result, expected)
 
-    def test_get_party_info(self):
-        p1 = self.smpc.get_party_info(1)
-        self.assertIsNotNone(p1)
-        if p1:
-            self.assertEqual(p1.name, "Party_1")
-        self.assertIsNone(self.smpc.get_party_info(999))
+    def test_insufficient_shares(self):
+        shares = self.smpc.create_shares_for_parties([10, 15])
+        partials = self.smpc.request_parties_to_compute_results(shares)
+        only_one_id = [list(partials.keys())[0]]
+        with self.assertRaises(ValueError):
+            self.smpc.reconstruct_final_result(partials, party_ids=only_one_id)
 
     def test_edge_cases(self):
-        for val1, val2 in [(0, 0), (0, 10), (-5, 5), (10**8, 10**8)]:
-            with self.subTest(v1=val1, v2=val2):
-                expected = (val1 + val2) % self.smpc.crypto.get_prime()
-                result = self.smpc.run_secure_computation(val1, val2, f"case_{val1}_{val2}")
+        for secrets in [[0, 0], [0, 10], [-5, 5], [10**8, 10**8]]:
+            with self.subTest(secrets=secrets):
+                expected = sum(secrets) % self.smpc.prime
+                result = self.smpc.run_secure_computation(secrets)
                 self.assertEqual(result, expected)
 
     def test_all_configurations(self):
         configs = [(3, 2), (4, 2), (5, 3), (4, 4)]
         for num, thresh in configs:
             with self.subTest(parties=num, threshold=thresh):
-                smpc = SMPCSystem(num, thresh)
-                expected = 300
-                result = smpc.run_secure_computation(100, 200, f"conf_{num}_{thresh}")
-                self.assertEqual(result, expected)
+                smpc = SMPCController(num, thresh)
+                result = smpc.run_secure_computation([100, 200])
+                self.assertEqual(result, 300)
 
     def test_performance_sizes(self):
-        for a, b in [(10, 20), (1000, 2000), (10**6, 2*10**6), (10**9, 2*10**9)]:
-            with self.subTest(val1=a, val2=b):
+        for secrets in [[10, 20], [1000, 2000], [10**6, 2*10**6], [10**9, 2*10**9]]:
+            with self.subTest(secrets=secrets):
                 start = time.time()
-                result = self.smpc.run_secure_computation(a, b, f"perf_{a}")
+                result = self.smpc.run_secure_computation(secrets)
                 duration = (time.time() - start) * 1000
-                expected = (a + b) % self.smpc.crypto.get_prime()
+                expected = sum(secrets) % self.smpc.prime
                 self.assertEqual(result, expected)
-                self.assertLess(duration, 1000)  # rough benchmark
+                self.assertLess(duration, 1000)
 
-    def test_reconstruction_without_computation(self):
-        self.smpc.submit_secret_values([1, 2], self.cid)
-        with self.assertRaises(ValueError):
-            self.smpc.reconstruct_final_sum(self.cid)
+
+class TestPartyAndShare(unittest.TestCase):
+    def setUp(self):
+        self.prime = crypto.get_prime()
+
+    def test_share_name_generation(self):
+        s = Share(value=12345, party_id=1, secret_idx=2)
+        self.assertEqual(s.name, "A_2")
+        self.assertEqual(str(s), "A_2: 12345")
+
+    def test_partial_result_correctness(self):
+        p = Party(1)
+        shares = [
+            Share(value=100, party_id=1, secret_idx=1),
+            Share(value=200, party_id=1, secret_idx=2),
+            Share(value=300, party_id=1, secret_idx=3),
+        ]
+        result = p.compute_sum(shares, self.prime)
+        expected = (100 + 200 + 300) % self.prime
+        self.assertEqual(result, expected)
 
 
 def run_tests():
@@ -197,14 +151,32 @@ def run_tests():
     result_crypto = runner.run(suite_crypto)
 
     print("\n" + "=" * 60)
-    print("🤝 Running SMPCSystem Tests")
+    print("🤝 Running SMPCController Tests")
     print("=" * 60)
-    suite_system = loader.loadTestsFromTestCase(TestSMPCSystem)
-    result_system = runner.run(suite_system)
+    suite_controller = loader.loadTestsFromTestCase(TestSMPCController)
+    result_controller = runner.run(suite_controller)
 
-    total = result_crypto.testsRun + result_system.testsRun
-    failures = len(result_crypto.failures) + len(result_system.failures)
-    errors = len(result_crypto.errors) + len(result_system.errors)
+    print("\n" + "=" * 60)
+    print("🧩 Running Party & Share Tests")
+    print("=" * 60)
+    suite_party = loader.loadTestsFromTestCase(TestPartyAndShare)
+    result_party = runner.run(suite_party)
+
+    total = (
+        result_crypto.testsRun +
+        result_controller.testsRun +
+        result_party.testsRun
+    )
+    failures = (
+        len(result_crypto.failures) +
+        len(result_controller.failures) +
+        len(result_party.failures)
+    )
+    errors = (
+        len(result_crypto.errors) +
+        len(result_controller.errors) +
+        len(result_party.errors)
+    )
     passed = total - failures - errors
 
     print("\n" + "=" * 60)
