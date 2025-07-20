@@ -29,7 +29,10 @@ python demo_script.py
 Run the full tests to verify everything works:
 python test_smpc.py
 
-Run tests on SMPC TCP system
+Run tests on SMPC TCP system:
+python test_smpc_tcp.py
+
+Run network integration tests:
 python test_smpc_tcp.py
 
 ---
