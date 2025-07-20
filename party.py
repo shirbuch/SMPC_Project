@@ -13,7 +13,7 @@ class Share:
     secret_idx: int
 
     def __init__(self, value: int, party_id: int, secret_idx: int):
-        self.name = f"{Party.id_to_name(party_id)}_{secret_idx}"
+        self.name = f"{Party.id_to_letter(party_id)}_{secret_idx}"
         self.value = value
         self.party_id = party_id
         self.secret_idx = secret_idx
@@ -41,9 +41,9 @@ class Party:
         return result
 
     def get_name(self):
-        return Party.id_to_name(self.id)
+        return f"Party_{Party.id_to_letter(self.id)}"
 
     @staticmethod
-    def id_to_name(id: int) -> str:
+    def id_to_letter(id: int) -> str:
         """Convert party ID (1-indexed) to uppercase letter (1 -> A)."""
         return f"{chr(64 + id)}"
