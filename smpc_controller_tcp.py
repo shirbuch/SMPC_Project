@@ -1,7 +1,6 @@
-import signal
 import sys
 from smpc_controller import SMPCController
-from comm_layer import send_data, receive_data
+from comm_layer import BaseServer
 from typing import List, Dict, Tuple
 import threading
 import time
@@ -9,25 +8,20 @@ import socket
 from party import Share
 
 
-class SMPCControllerTCP:
+class SMPCControllerTCP(BaseServer):
     def __init__(self, num_parties: int = 3, threshold: int = 2):
+        super().__init__('0.0.0.0', 9000, "Controller")
         self.controller = SMPCController(num_parties=num_parties, threshold=threshold)
         self.party_hosts: List[Tuple[str, int]] = [("localhost", 8000 + i + 1) for i in range(num_parties)]
         self.party_sums: Dict[int, int] = {}
 
     def start_listener(self):
         thread = threading.Thread(
-            target=receive_data,
-            args=('0.0.0.0', 9000, self.receive_party_sum),
+            target=self.start_server,
             daemon=True
         )
         thread.start()
 
-    def shutdown_handler(self, sig, frame):
-        print("\n[Controller] Caught Ctrl+C. Shutting down...")
-        self.stop_listener()
-        sys.exit(0)
-    
     def stop_listener(self):
         try:
             # Attempt to close the socket if it's still open
@@ -46,13 +40,13 @@ class SMPCControllerTCP:
             shares = share_map[party.id]
             host, port = self.party_hosts[party.id - 1]
             print(f"[Controller] → {party.get_name()} at {host}:{port}: {[s.name for s in shares]}")
-            send_data(host, port, {
+            self.send_data(host, port, {
                 'action': 'compute_sum',
                 'shares': shares,                # list of Share objects
                 'prime': self.controller.prime   # send prime explicitly
             })
 
-    def receive_party_sum(self, data: dict):
+    def handle_incoming(self, data: dict):
         pid = data.get('party_id')
         val = data.get('sum')
         if pid is None or val is None:
@@ -77,8 +71,6 @@ class SMPCControllerTCP:
         self.party_sums.clear()
         self.start_listener()
 
-        signal.signal(signal.SIGINT, self.shutdown_handler)
-
         self.distribute_shares(secrets)
         time.sleep(1)  # allow parties to receive and compute
 
@@ -87,7 +79,7 @@ class SMPCControllerTCP:
             while len(self.party_sums) < self.controller.threshold:
                 time.sleep(0.2)
         except KeyboardInterrupt:
-            self.shutdown_handler(None, None)
+            self.signal_handler(None, None)
 
         result = self.reconstruct_sum()
         expected = sum(secrets) % self.controller.prime
@@ -95,3 +87,21 @@ class SMPCControllerTCP:
         print(f"[Controller] Expected    : {expected}")
         print("MATCH" if result == expected else "MISMATCH")
         return result
+
+
+def main():
+    """Run TCP-based SMPC computation"""
+    secrets = [100, 250, 40]
+    controller = SMPCControllerTCP(num_parties=3, threshold=2)
+    
+    try:
+        result = controller.run(secrets)
+        print(f"\n✅ Computation completed! Result: {result}")
+    except Exception as e:
+        print(f"\n❌ Computation failed: {e}")
+        import traceback
+        traceback.print_exc()
+
+
+if __name__ == "__main__":
+    main()
