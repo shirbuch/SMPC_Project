@@ -18,13 +18,14 @@ class Share:
         self.party_id = party_id
         self.secret_idx = secret_idx
 
-    def short(self) -> str:
-        """Return truncated string representation of value for display."""
-        s = str(self.value)
+    @staticmethod
+    def short(val: int) -> str:
+        """Return truncated string representation of a value for display."""
+        s = str(val)
         return s[:5] + "..." if len(s) > 5 else s
 
     def __str__(self) -> str:
-        return f"{self.name}: {self.short()}"
+        return f"{self.name}: {Share.short(self.value)}"
 
 
 @dataclass

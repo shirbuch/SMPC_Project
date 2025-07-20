@@ -9,6 +9,7 @@ Run the parties:
 python party_server.py 1
 python party_server.py 2
 python party_server.py 3
+Each number passed must be a unique party ID (e.g. 1, 2, 3) corresponding to port 8001, 8002, 8003.
 
 Stop a party:
 ctrl + C

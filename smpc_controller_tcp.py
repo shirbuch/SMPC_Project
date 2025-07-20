@@ -6,11 +6,7 @@ from typing import List, Dict, Tuple
 import threading
 import time
 import socket
-
-
-def short(val: int) -> str:
-    s = str(val)
-    return s[:5] + "..." if len(s) > 5 else s
+from party import Share
 
 
 class SMPCControllerTCP:
@@ -63,7 +59,7 @@ class SMPCControllerTCP:
             print("[Controller] Invalid data received.")
             return
         self.party_sums[pid] = val
-        print(f"[Controller] Received sum from Party {pid}: {short(val)}")
+        print(f"[Controller] Received sum from Party {pid}: {Share.short(val)}")
 
     def reconstruct_sum(self) -> int:
         if len(self.party_sums) < self.controller.threshold:
@@ -72,7 +68,7 @@ class SMPCControllerTCP:
         selected = sorted(self.party_sums.items())[:self.controller.threshold]
         print("[Controller] Reconstructing final result from:")
         for pid, val in selected:
-            print(f"   Party {pid}: {short(val)}")
+            print(f"   Party {pid}: {Share.short(val)}")
 
         return self.controller.reconstruct_final_result(dict(selected))
 

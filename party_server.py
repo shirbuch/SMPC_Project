@@ -19,11 +19,6 @@ shutdown_flag = threading.Event()
 server_socket = None
 
 
-def short(val: int) -> str:
-    s = str(val)
-    return s[:5] + "..." if len(s) > 5 else s
-
-
 def handle_incoming(data: dict):
     action = data.get('action')
     print(f"[{party.get_name()}] Received action '{action}'")
@@ -45,7 +40,7 @@ def handle_incoming(data: dict):
             print(f"   {share}")
 
         local_sum = party.compute_sum(shares, prime)
-        print(f"[{party.get_name()}] Computed local sum: {short(local_sum)}")
+        print(f"[{party.get_name()}] Computed local sum: {Share.short(local_sum)}")
 
         send_data(controller_host, controller_port, {
             'party_id': party_id,
