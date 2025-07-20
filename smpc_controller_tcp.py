@@ -1,8 +1,11 @@
+import signal
+import sys
 from smpc_controller import SMPCController
 from comm_layer import send_data, receive_data
 from typing import List, Dict, Tuple
 import threading
 import time
+import socket
 
 
 def short(val: int) -> str:
@@ -24,6 +27,21 @@ class SMPCControllerTCP:
         )
         thread.start()
 
+    def shutdown_handler(self, sig, frame):
+        print("\n[Controller] Caught Ctrl+C. Shutting down...")
+        self.stop_listener()
+        sys.exit(0)
+    
+    def stop_listener(self):
+        try:
+            # Attempt to close the socket if it's still open
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.connect(('localhost', 9000))
+                s.close()
+        except Exception as e:
+            print(f"[Controller] Error stopping listener: {e}")
+        print("[Controller] Listener stopped.")
+        
     def distribute_shares(self, secrets: List[int]) -> None:
         print("[Controller] Creating and distributing shares...")
         share_map = self.controller.create_shares_for_parties(secrets)
@@ -39,8 +57,11 @@ class SMPCControllerTCP:
             })
 
     def receive_party_sum(self, data: dict):
-        pid = data['party_id']
-        val = data['sum']
+        pid = data.get('party_id')
+        val = data.get('sum')
+        if pid is None or val is None:
+            print("[Controller] Invalid data received.")
+            return
         self.party_sums[pid] = val
         print(f"[Controller] Received sum from Party {pid}: {short(val)}")
 
@@ -60,12 +81,17 @@ class SMPCControllerTCP:
         self.party_sums.clear()
         self.start_listener()
 
+        signal.signal(signal.SIGINT, self.shutdown_handler)
+
         self.distribute_shares(secrets)
         time.sleep(1)  # allow parties to receive and compute
 
         print("[Controller] Waiting for results...")
-        while len(self.party_sums) < self.controller.threshold:
-            time.sleep(0.2)
+        try:
+            while len(self.party_sums) < self.controller.threshold:
+                time.sleep(0.2)
+        except KeyboardInterrupt:
+            self.shutdown_handler(None, None)
 
         result = self.reconstruct_sum()
         expected = sum(secrets) % self.controller.prime
