@@ -15,7 +15,7 @@ Stop a party:
 ctrl + C
 
 Run the controller:
-python -c "from smpc_controller_tcp import SMPCControllerTCP; smpc=SMPCControllerTCP(); smpc.run([100,250])"        
+python -c "from smpc_controller_server import SMPCControllerServer; smpc=SMPCControllerServer(); smpc.run([100,250])"        
 
 Run the system locally:
 python smpc_controller.py
@@ -26,14 +26,11 @@ python demo_script.py
 ---
 
 ## 🧪 Testing
-Run the full tests to verify everything works:
+Run tests locally:
 python test_smpc.py
 
-Run tests on SMPC TCP system:
-python test_smpc_tcp.py
-
 Run network integration tests:
-python test_smpc_tcp.py
+python test_smpc_servers.py
 
 ---
 

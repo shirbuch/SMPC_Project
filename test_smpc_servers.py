@@ -13,15 +13,13 @@ import os
 from unittest.mock import Mock, patch, MagicMock
 from typing import List, Dict
 
-RUN_NETWORK_TESTS = True
-
 # Add the current directory to the path so we can import our modules
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 try:
     from comm_layer import BaseServer
     from party_server import PartyServer
-    from smpc_controller_tcp import SMPCControllerTCP
+    from smpc_controller_server import SMPCControllerServer
     from party import Party, Share
     from smpc_controller import SMPCController
 except ImportError as e:
@@ -105,7 +103,7 @@ class TestSMPCControllerTCP(unittest.TestCase):
     """Test SMPCControllerTCP functionality"""
     
     def setUp(self):
-        self.controller = SMPCControllerTCP(num_parties=3, threshold=2)
+        self.controller = SMPCControllerServer(num_parties=3, threshold=2)
     
     def test_controller_initialization(self):
         """Test controller initialization"""
@@ -140,7 +138,7 @@ class TestSMPCControllerTCP(unittest.TestCase):
         # Should not add anything to party_sums
         self.assertEqual(len(self.controller.party_sums), 0)
     
-    @patch.object(SMPCControllerTCP, 'send_data')
+    @patch.object(SMPCControllerServer, 'send_data')
     def test_distribute_shares(self, mock_send):
         """Test share distribution to parties"""
         secrets = [100, 200, 300]
@@ -165,7 +163,7 @@ class TestSMPCControllerTCP(unittest.TestCase):
         self.controller.party_sums = {1: 100}  # Only one party
         
         with self.assertRaises(ValueError):
-            self.controller.reconstruct_sum()
+            self.controller.reconstruct_final_result()
     
     @patch.object(SMPCController, 'reconstruct_final_result')
     def test_reconstruct_sum_success(self, mock_reconstruct):
@@ -174,7 +172,7 @@ class TestSMPCControllerTCP(unittest.TestCase):
         
         self.controller.party_sums = {1: 100, 2: 200, 3: 300}
         
-        result = self.controller.reconstruct_sum()
+        result = self.controller.reconstruct_final_result()
         
         self.assertEqual(result, 42)
         mock_reconstruct.assert_called_once()
@@ -183,12 +181,12 @@ class TestSMPCControllerTCP(unittest.TestCase):
 class TestIntegrationMocked(unittest.TestCase):
     """Integration tests using mocked network communication"""
     
-    @patch('smpc_controller_tcp.time.sleep')
-    @patch.object(SMPCControllerTCP, 'send_data')
-    @patch.object(SMPCControllerTCP, 'start_listener')
+    @patch('smpc_controller_server.time.sleep')
+    @patch.object(SMPCControllerServer, 'send_data')
+    @patch.object(SMPCControllerServer, 'start_listener')
     def test_full_computation_flow(self, mock_start_listener, mock_send_data, mock_sleep):
         """Test the complete computation flow with mocked network"""
-        controller = SMPCControllerTCP(num_parties=3, threshold=2)
+        controller = SMPCControllerServer(num_parties=3, threshold=2)
         
         # Track when distribution happens so we can send responses after
         original_distribute = controller.distribute_shares
@@ -268,7 +266,7 @@ def run_system_validation():
         print("✓ SMPC Controller created")
         
         # Test TCP controller creation
-        tcp_controller = SMPCControllerTCP(num_parties=3, threshold=2)
+        tcp_controller = SMPCControllerServer(num_parties=3, threshold=2)
         print("✓ TCP Controller created")
         
         # Test party server creation

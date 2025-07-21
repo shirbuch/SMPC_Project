@@ -8,7 +8,7 @@ import socket
 from party import Share
 
 
-class SMPCControllerTCP(BaseServer):
+class SMPCControllerServer(BaseServer):
     def __init__(self, num_parties: int = 3, threshold: int = 2):
         super().__init__('0.0.0.0', 9000, "Controller")
         self.controller = SMPCController(num_parties=num_parties, threshold=threshold)
@@ -38,7 +38,7 @@ class SMPCControllerTCP(BaseServer):
         self.party_sums[pid] = val
         print(f"[{self.name}] Received sum from Party {pid}: {Share.short(val)}")
 
-    def reconstruct_sum(self) -> int:
+    def reconstruct_final_result(self) -> int:
         if len(self.party_sums) < self.controller.threshold:
             raise ValueError("Not enough party sums to reconstruct")
 
@@ -47,7 +47,9 @@ class SMPCControllerTCP(BaseServer):
         for pid, val in selected:
             print(f"   Party {pid}: {Share.short(val)}")
 
-        return self.controller.reconstruct_final_result(dict(selected))
+        result = self.controller.reconstruct_final_result(dict(selected))
+        self.party_sums.clear()  # Clear after reconstruction
+        return result
 
     def run(self, secrets: List[int]) -> int:
         print(f"[{self.name}] Starting secure computation")
@@ -64,7 +66,7 @@ class SMPCControllerTCP(BaseServer):
         except KeyboardInterrupt:
             self.signal_handler(None, None)
 
-        result = self.reconstruct_sum()
+        result = self.reconstruct_final_result()
         expected = sum(secrets) % self.controller.prime
         print(f"[{self.name}] Final Result: {result}")
         print(f"[{self.name}] Expected    : {expected}")
@@ -75,7 +77,7 @@ class SMPCControllerTCP(BaseServer):
 def main():
     """Run TCP-based SMPC computation"""
     secrets = [100, 250, 40]
-    controller = SMPCControllerTCP(num_parties=3, threshold=2)
+    controller = SMPCControllerServer(num_parties=3, threshold=2)
     
     try:
         result = controller.run(secrets)
