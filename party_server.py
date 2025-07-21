@@ -12,35 +12,35 @@ class PartyServer(BaseServer, Party):
         port = 8000 + party_id
         
         # Initialize both parent classes
-        BaseServer.__init__(self, host, port, f"Party_{Party.id_to_letter(party_id)}")
         Party.__init__(self, party_id)
+        BaseServer.__init__(self, host, port, self.get_name())
         
         self.controller_host = controller_host
         self.controller_port = controller_port
     
     def handle_incoming(self, data: dict):
         action = data.get('action')
-        print(f"[{self.get_name()}] Received action '{action}'")
+        print(f"[{self.name}] Received action '{action}'")
 
         if action == 'compute_sum':
             try:
                 shares, prime = self.unpack_compute_sum_request(data)
                 
-                print(f"[{self.get_name()}] Received {len(shares)} shares:")
+                print(f"[{self.name}] Received {len(shares)} shares:")
                 for share in shares:
                     print(f"   {share}")
 
                 local_sum = self.compute_sum(shares, prime)
-                print(f"[{self.get_name()}] Computed local sum: {Share.short(local_sum)}")
+                print(f"[{self.name}] Computed local sum: {Share.short(local_sum)}")
 
                 self.send_data(self.controller_host, self.controller_port, {
                     'party_id': self.id,
                     'sum': local_sum
                 })
-                print(f"[{self.get_name()}] Sent result back to controller.")
+                print(f"[{self.name}] Sent result back to controller.")
                 
             except ValueError as e:
-                print(f"[{self.get_name()}] Error: {e}")
+                print(f"[{self.name}] Error: {e}")
 
 
 def main():

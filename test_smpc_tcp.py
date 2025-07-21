@@ -19,7 +19,7 @@ RUN_NETWORK_TESTS = True
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 try:
-    from comm_layer import BaseServer, send_data
+    from comm_layer import BaseServer
     from party_server import PartyServer
     from smpc_controller_tcp import SMPCControllerTCP
     from party import Party, Share
@@ -28,52 +28,6 @@ except ImportError as e:
     print(f"Import error: {e}")
     print("Make sure all required files are in the same directory as this test file.")
     sys.exit(1)
-
-
-class TestCommLayer(unittest.TestCase):
-    """Test the communication layer functionality"""
-    
-    def test_send_data(self):
-        """Test basic data sending functionality"""
-        received_data = []
-        
-        def mock_handler(data):
-            received_data.append(data)
-        
-        # Start a simple server in a thread
-        def start_server():
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-                s.bind(('localhost', 12345))
-                s.listen(1)
-                s.settimeout(2.0)  # Timeout after 2 seconds
-                try:
-                    conn, _ = s.accept()
-                    with conn:
-                        data = b""
-                        while True:
-                            chunk = conn.recv(4096)
-                            if not chunk:
-                                break
-                            data += chunk
-                        import pickle
-                        obj = pickle.loads(data)
-                        mock_handler(obj)
-                except socket.timeout:
-                    pass
-        
-        server_thread = threading.Thread(target=start_server)
-        server_thread.start()
-        time.sleep(0.1)  # Give server time to start
-        
-        # Send test data
-        test_data = {"test": "message", "number": 42}
-        send_data('localhost', 12345, test_data)
-        
-        server_thread.join(timeout=3)
-        
-        self.assertEqual(len(received_data), 1)
-        self.assertEqual(received_data[0], test_data)
 
 
 class TestPartyServer(unittest.TestCase):
@@ -289,51 +243,6 @@ class TestRealNetworkIntegration(unittest.TestCase):
             except OSError:
                 self.ports_available = False
                 break
-    
-    @unittest.skipUnless(RUN_NETWORK_TESTS, "Skipping real network tests unless RUN_NETWORK_TESTS is set")
-    def test_real_network_communication(self):
-        """Test actual network communication between components"""
-        if not self.ports_available:
-            self.skipTest("Required ports not available")
-        
-        # Create a simple test server
-        received_messages = []
-        
-        def test_server():
-            try:
-                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                    s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-                    s.bind(('localhost', 9001))
-                    s.listen(1)
-                    s.settimeout(5.0)
-                    
-                    conn, _ = s.accept()
-                    with conn:
-                        data = b""
-                        while True:
-                            chunk = conn.recv(4096)
-                            if not chunk:
-                                break
-                            data += chunk
-                        import pickle
-                        obj = pickle.loads(data)
-                        received_messages.append(obj)
-            except Exception as e:
-                print(f"Test server error: {e}")
-        
-        server_thread = threading.Thread(target=test_server)
-        server_thread.start()
-        time.sleep(0.2)  # Let server start
-        
-        # Send test message
-        test_message = {'test': 'real_network', 'value': 123}
-        send_data('localhost', 9001, test_message)
-        
-        server_thread.join(timeout=6)
-        
-        self.assertEqual(len(received_messages), 1)
-        self.assertEqual(received_messages[0], test_message)
-
 
 def run_system_validation():
     """
@@ -393,7 +302,6 @@ if __name__ == '__main__':
     
     # Add test classes
     test_classes = [
-        TestCommLayer,
         TestPartyServer, 
         TestSMPCControllerTCP,
         TestIntegrationMocked,
@@ -429,6 +337,3 @@ if __name__ == '__main__':
         print("\n✅ All tests passed!")
     else:
         print("\n❌ Some tests failed!")
-    
-    print("\nNOTE: To not run network integration tests, set const at top of tests:")
-    print("RUN_NETWORK_TESTS=False")

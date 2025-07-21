@@ -14,32 +14,15 @@ class SMPCControllerTCP(BaseServer):
         self.controller = SMPCController(num_parties=num_parties, threshold=threshold)
         self.party_hosts: List[Tuple[str, int]] = [("localhost", 8000 + i + 1) for i in range(num_parties)]
         self.party_sums: Dict[int, int] = {}
-
-    def start_listener(self):
-        thread = threading.Thread(
-            target=self.start_server,
-            daemon=True
-        )
-        thread.start()
-
-    def stop_listener(self):
-        try:
-            # Attempt to close the socket if it's still open
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                s.connect(('localhost', 9000))
-                s.close()
-        except Exception as e:
-            print(f"[Controller] Error stopping listener: {e}")
-        print("[Controller] Listener stopped.")
-        
+   
     def distribute_shares(self, secrets: List[int]) -> None:
-        print("[Controller] Creating and distributing shares...")
+        print(f"[{self.name}] Creating and distributing shares...")
         share_map = self.controller.create_shares_for_parties(secrets)
 
         for party in self.controller.parties:
             shares = share_map[party.id]
             host, port = self.party_hosts[party.id - 1]
-            print(f"[Controller] → {party.get_name()} at {host}:{port}: {[s.name for s in shares]}")
+            print(f"[{self.name}] → {party.get_name()} at {host}:{port}: {[s.name for s in shares]}")
             self.send_data(host, port, {
                 'action': 'compute_sum',
                 'shares': shares,                # list of Share objects
@@ -50,31 +33,31 @@ class SMPCControllerTCP(BaseServer):
         pid = data.get('party_id')
         val = data.get('sum')
         if pid is None or val is None:
-            print("[Controller] Invalid data received.")
+            print(f"[{self.name}] Invalid data received.")
             return
         self.party_sums[pid] = val
-        print(f"[Controller] Received sum from Party {pid}: {Share.short(val)}")
+        print(f"[{self.name}] Received sum from Party {pid}: {Share.short(val)}")
 
     def reconstruct_sum(self) -> int:
         if len(self.party_sums) < self.controller.threshold:
             raise ValueError("Not enough party sums to reconstruct")
 
         selected = sorted(self.party_sums.items())[:self.controller.threshold]
-        print("[Controller] Reconstructing final result from:")
+        print(f"[{self.name}] Reconstructing final result from:")
         for pid, val in selected:
             print(f"   Party {pid}: {Share.short(val)}")
 
         return self.controller.reconstruct_final_result(dict(selected))
 
     def run(self, secrets: List[int]) -> int:
-        print("[Controller] Starting secure computation")
+        print(f"[{self.name}] Starting secure computation")
         self.party_sums.clear()
         self.start_listener()
 
         self.distribute_shares(secrets)
         time.sleep(1)  # allow parties to receive and compute
 
-        print("[Controller] Waiting for results...")
+        print(f"[{self.name}] Waiting for results...")
         try:
             while len(self.party_sums) < self.controller.threshold:
                 time.sleep(0.2)
@@ -83,8 +66,8 @@ class SMPCControllerTCP(BaseServer):
 
         result = self.reconstruct_sum()
         expected = sum(secrets) % self.controller.prime
-        print(f"[Controller] Final Result: {result}")
-        print(f"[Controller] Expected    : {expected}")
+        print(f"[{self.name}] Final Result: {result}")
+        print(f"[{self.name}] Expected    : {expected}")
         print("MATCH" if result == expected else "MISMATCH")
         return result
 
