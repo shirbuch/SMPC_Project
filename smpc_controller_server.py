@@ -14,7 +14,21 @@ class SMPCControllerServer(BaseServer):
         self.controller = SMPCController(num_parties=num_parties, threshold=threshold)
         self.party_hosts: List[Tuple[str, int]] = [("localhost", 8000 + i + 1) for i in range(num_parties)]
         self.party_sums: Dict[int, int] = {}
-   
+
+    def send_data_with_retry(self, host: str, port: int, data: dict, retries: int = 20, delay: float = 1.0):
+        for attempt in range(1, retries + 1):
+            try:
+                self.send_data(host, port, data)
+                return
+            except (ConnectionRefusedError, socket.timeout, OSError):
+                print(f"[{self.name}] Party at {host}:{port} not ready, retrying ({attempt}/{retries})...")
+                time.sleep(delay)
+
+        # After retries exhausted
+        print(f"[{self.name}] ⏳ Party at {host}:{port} still not available.")
+        input(f"[{self.name}] Press Enter to keep retrying, or Ctrl+C to abort.")
+        self.send_data_with_retry(host, port, data, retries=retries, delay=delay)
+
     def distribute_shares(self, secrets: List[int]) -> None:
         print(f"[{self.name}] Creating and distributing shares...")
         share_map = self.controller.create_shares_for_parties(secrets)
@@ -23,7 +37,7 @@ class SMPCControllerServer(BaseServer):
             shares = share_map[party.id]
             host, port = self.party_hosts[party.id - 1]
             print(f"[{self.name}] → {party.get_name()} at {host}:{port}: {[s.name for s in shares]}")
-            self.send_data(host, port, {
+            self.send_data_with_retry(host, port, {
                 'action': 'compute_sum',
                 'shares': shares,                # list of Share objects
                 'prime': self.controller.prime   # send prime explicitly
@@ -57,8 +71,6 @@ class SMPCControllerServer(BaseServer):
         self.start_listener()
 
         self.distribute_shares(secrets)
-        time.sleep(1)  # allow parties to receive and compute
-
         print(f"[{self.name}] Waiting for results...")
         try:
             while len(self.party_sums) < self.controller.threshold:
@@ -75,12 +87,17 @@ class SMPCControllerServer(BaseServer):
 
 
 def main():
-    """Run TCP-based SMPC computation"""
-    secrets = [100, 250, 40]
-    controller = SMPCControllerServer(num_parties=3, threshold=2)
-    
+    import argparse
+    parser = argparse.ArgumentParser(description="Run SMPC controller server.")
+    parser.add_argument("secrets", nargs="+", type=int, help="List of secrets to compute securely.")
+    parser.add_argument("-n", "--num_parties", type=int, default=3, help="Number of parties")
+    parser.add_argument("-t", "--threshold", type=int, default=2, help="Threshold for reconstruction")
+    args = parser.parse_args()
+
+    controller = SMPCControllerServer(num_parties=args.num_parties, threshold=args.threshold)
+
     try:
-        result = controller.run(secrets)
+        result = controller.run(args.secrets)
         print(f"\n✅ Computation completed! Result: {result}")
     except Exception as e:
         print(f"\n❌ Computation failed: {e}")

@@ -14,8 +14,10 @@ Each number passed must be a unique party ID (e.g. 1, 2, 3) corresponding to por
 Stop a party:
 ctrl + C
 
-Run the controller:
-python -c "from smpc_controller_server import SMPCControllerServer; smpc=SMPCControllerServer(); smpc.run([100,250])"        
+Run the controller (after running the parties):
+python smpc_controller_server.py 100 200 -n 3 -t 2
+n: number of parties
+t: threshold
 
 Run the system locally:
 python smpc_controller.py
