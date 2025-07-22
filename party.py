@@ -50,16 +50,3 @@ class Party:
     def id_to_letter(id: int) -> str:
         """Convert party ID (1-indexed) to uppercase letter (1 -> A)."""
         return f"{chr(64 + id)}"
-    
-    def unpack_compute_sum_request(self, data: dict) -> Tuple[List[Share], int]:
-        """Unpack compute_sum request data and validate"""
-        raw_shares = data.get('shares', [])
-        prime = data.get('prime')
-        
-        if not isinstance(prime, int):
-            raise ValueError("Missing or invalid prime field")
-        
-        if not isinstance(raw_shares, list) or not all(isinstance(s, Share) for s in raw_shares):
-            raise ValueError("Invalid share data received")
-        
-        return raw_shares, prime

@@ -1,5 +1,5 @@
 import sys
-from typing import List
+from typing import List, Tuple
 from party import Party, Share
 from comm_layer import BaseServer
 
@@ -42,6 +42,18 @@ class PartyServer(BaseServer, Party):
             except ValueError as e:
                 print(f"[{self.name}] Error: {e}")
 
+    def unpack_compute_sum_request(self, data: dict) -> Tuple[List[Share], int]:
+        """Unpack compute_sum request data and validate"""
+        raw_shares = data.get('shares', [])
+        prime = data.get('prime')
+        
+        if not isinstance(prime, int):
+            raise ValueError("Missing or invalid prime field")
+        
+        if not isinstance(raw_shares, list) or not all(isinstance(s, Share) for s in raw_shares):
+            raise ValueError("Invalid share data received")
+        
+        return raw_shares, prime
 
 def main():
     if len(sys.argv) != 2:
