@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 from typing import List, Dict, Tuple
 
+from smpc_crypto import add_shares
+
 
 class Share:
     """
@@ -38,7 +40,7 @@ class Party:
 
     def compute_sum(self, shares: List[Share], prime: int) -> int:
         """Compute sum of given shares mod prime."""
-        result = sum(share.value for share in shares) % prime
+        result = add_shares([share.value for share in shares], prime)
         return result
 
     def get_name(self):
