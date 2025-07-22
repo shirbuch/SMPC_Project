@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import List
+from typing import List, Dict, Tuple
 
 
 class Share:
@@ -13,18 +13,19 @@ class Share:
     secret_idx: int
 
     def __init__(self, value: int, party_id: int, secret_idx: int):
-        self.name = f"{Party.id_to_name(party_id)}_{secret_idx}"
+        self.name = f"{Party.id_to_letter(party_id)}_{secret_idx}"
         self.value = value
         self.party_id = party_id
         self.secret_idx = secret_idx
 
-    def short(self) -> str:
-        """Return truncated string representation of value for display."""
-        s = str(self.value)
+    @staticmethod
+    def short(val: int) -> str:
+        """Return truncated string representation of a value for display."""
+        s = str(val)
         return s[:5] + "..." if len(s) > 5 else s
 
     def __str__(self) -> str:
-        return f"{self.name}: {self.short()}"
+        return f"{self.name}: {Share.short(self.value)}"
 
 
 @dataclass
@@ -41,9 +42,22 @@ class Party:
         return result
 
     def get_name(self):
-        return Party.id_to_name(self.id)
+        return f"Party_{Party.id_to_letter(self.id)}"
 
     @staticmethod
-    def id_to_name(id: int) -> str:
+    def id_to_letter(id: int) -> str:
         """Convert party ID (1-indexed) to uppercase letter (1 -> A)."""
         return f"{chr(64 + id)}"
+    
+    def unpack_compute_sum_request(self, data: dict) -> Tuple[List[Share], int]:
+        """Unpack compute_sum request data and validate"""
+        raw_shares = data.get('shares', [])
+        prime = data.get('prime')
+        
+        if not isinstance(prime, int):
+            raise ValueError("Missing or invalid prime field")
+        
+        if not isinstance(raw_shares, list) or not all(isinstance(s, Share) for s in raw_shares):
+            raise ValueError("Invalid share data received")
+        
+        return raw_shares, prime

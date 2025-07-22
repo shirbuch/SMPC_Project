@@ -4,15 +4,36 @@ A Python implementation of Secure Multi-Party Computation using Shamir's Secret 
 
 ---
 
-## ✅ Quick Run and Test
-Run the system:
+## 🚀 Running
+Run the parties:
+python party_server.py 1
+python party_server.py 2
+python party_server.py 3
+Each number passed must be a unique party ID (e.g. 1, 2, 3) corresponding to port 8001, 8002, 8003.
+
+Stop a party:
+ctrl + C
+
+Run the controller (after running the parties):
+python smpc_controller_server.py 100 200 -n 3 -t 2
+n: number of parties
+t: threshold
+
+Run the system locally:
 python smpc_controller.py
 
-Run the full demo:
+Run the local full demo:
 python demo_script.py
 
-Run the full tests to verify everything works:
+---
+
+## 🧪 Testing
+Run tests locally:
 python test_smpc.py
+
+Run network integration tests:
+python test_smpc_servers.py
+
 ---
 
 ## 🎯 Project Overview

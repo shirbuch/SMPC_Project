@@ -1,7 +1,6 @@
 from typing import List, Dict, Optional
 from party import Party, Share
 import smpc_crypto as crypto
-from dataclasses import dataclass
 
 
 class SMPCController:
