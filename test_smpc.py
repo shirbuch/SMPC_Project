@@ -1,4 +1,16 @@
 #!/usr/bin/env python3
+"""
+Unit Tests for SMPC System
+
+Covers:
+- SMPC cryptographic primitives (sharing, reconstruction, homomorphic addition)
+- SMPC controller logic (share distribution, secure computation)
+- Party and Share behavior
+
+To run:
+    python test_smpc.py
+"""
+
 import unittest
 import random
 import time
@@ -8,6 +20,8 @@ from party import Party, Share
 
 
 class TestSMPCCrypto(unittest.TestCase):
+    """Test core SMPC cryptographic operations"""
+
     def setUp(self):
         self.prime = crypto.get_prime()
         self.secret = 12345
@@ -15,21 +29,25 @@ class TestSMPCCrypto(unittest.TestCase):
         self.num_shares = 5
 
     def test_create_shares_valid(self):
+        """Should generate correct number of unique shares"""
         shares = crypto.create_shares(self.secret, self.threshold, self.num_shares, self.prime)
         self.assertEqual(len(shares), self.num_shares)
         self.assertEqual(len(set(x for x, _ in shares)), self.num_shares)
 
     def test_create_shares_invalid(self):
+        """Should raise error when threshold > num_shares"""
         with self.assertRaises(ValueError):
             crypto.create_shares(42, 6, 5, self.prime)
 
     def test_reconstruct_secret_success(self):
+        """Should recover the original secret from threshold shares"""
         shares = crypto.create_shares(self.secret, self.threshold, self.num_shares, self.prime)
         random.shuffle(shares)
         rec = crypto.reconstruct_secret(shares[:self.threshold], self.prime)
         self.assertEqual(rec, self.secret)
 
     def test_reconstruct_secret_failure(self):
+        """Should raise error with insufficient shares"""
         shares = crypto.create_shares(self.secret, self.threshold, self.num_shares, self.prime)
         with self.assertRaises(ValueError):
             crypto.reconstruct_secret(shares[:1], self.prime)
@@ -37,17 +55,18 @@ class TestSMPCCrypto(unittest.TestCase):
             crypto.reconstruct_secret([], self.prime)
 
     def test_add_shares_valid(self):
+        """Should correctly add shares and reconstruct sum"""
         s1, s2 = 100, 200
         shares1 = crypto.create_shares(s1, self.threshold, self.num_shares, self.prime)
         shares2 = crypto.create_shares(s2, self.threshold, self.num_shares, self.prime)
 
-        # Add shares element-wise using value extraction
         added = [(x[0], (x[1] + y[1]) % self.prime) for x, y in zip(shares1, shares2)]
         result = crypto.reconstruct_secret(added[:self.threshold], self.prime)
         expected = (s1 + s2) % self.prime
         self.assertEqual(result, expected)
 
     def test_threshold_security(self):
+        """Should fail below threshold, succeed at or above it"""
         shares = crypto.create_shares(self.secret, threshold=3, num_shares=5, prime=self.prime)
         rec = crypto.reconstruct_secret(shares[:2], self.prime)
         self.assertNotEqual(rec, self.secret)
@@ -58,6 +77,8 @@ class TestSMPCCrypto(unittest.TestCase):
 
 
 class TestSMPCController(unittest.TestCase):
+    """Test SMPCController functionality"""
+
     def setUp(self):
         self.smpc = SMPCController(3, 2)
 
@@ -116,6 +137,8 @@ class TestSMPCController(unittest.TestCase):
 
 
 class TestPartyAndShare(unittest.TestCase):
+    """Test Party and Share behavior"""
+
     def setUp(self):
         self.prime = crypto.get_prime()
 
@@ -137,6 +160,12 @@ class TestPartyAndShare(unittest.TestCase):
 
 
 def run_tests():
+    """
+    Run all SMPC-related tests and print a summary.
+
+    Returns:
+        bool: True if all tests passed, else False
+    """
     loader = unittest.TestLoader()
     runner = unittest.TextTestRunner(verbosity=2)
 

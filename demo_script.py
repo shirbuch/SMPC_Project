@@ -1,6 +1,15 @@
 #!/usr/bin/env python3
 """
 Interactive Demo Script for SMPC Collaborative Data Analysis
+
+This script provides a user-friendly demonstration of Secure Multi-Party Computation (SMPC)
+using Shamir's Secret Sharing scheme. Users can interactively:
+- Enter secrets to be securely computed
+- Observe share distribution among parties
+- See how partial computations are securely reconstructed
+- Explore security and performance of the system
+
+It supports multiple demo modes through a text menu interface and CLI flags.
 """
 
 import sys
@@ -8,24 +17,39 @@ import time
 from smpc_controller import SMPCController
 import smpc_crypto as crypto
 
-
 def print_banner():
+    """Display a decorative SMPC banner to introduce the demo."""
     banner = """
-    ╔══════════════════════════════════════════════════════════════╗
+    ╔════════════════════════════════════════════════════════════════╗
     ║              SMPC Collaborative Data Analysis Demo           ║
     ║                                                              ║
     ║ Secure Multi-Party Computation using Shamir's Secret Sharing ║
-    ╚══════════════════════════════════════════════════════════════╝
+    ╚════════════════════════════════════════════════════════════╝
     """
     print(banner)
 
 def print_step(step_num: int, description: str, details: str = ""):
+    """
+    Print a numbered demo step with optional additional details.
+
+    Args:
+        step_num (int): Step number for reference.
+        description (str): Main description of the step.
+        details (str, optional): Further explanation to be printed below.
+    """
     print(f"\n🔹 Step {step_num}: {description}")
     if details:
         print(f"   {details}")
     time.sleep(0.5)
 
 def demonstrate_basic_workflow():
+    """
+    Demonstrate the full basic SMPC workflow:
+    - Secret entry
+    - Share creation
+    - Local computations
+    - Secure reconstruction of the final result
+    """
     print("\n" + "=" * 60)
     print("📊 BASIC SMPC WORKFLOW DEMONSTRATION")
     print("=" * 60)
@@ -82,6 +106,11 @@ def demonstrate_basic_workflow():
     print(f"\n🛡️  Privacy guarantee: No party learned the individual secrets!")
 
 def demonstrate_security_properties():
+    """
+    Demonstrate security properties of Shamir's Secret Sharing:
+    - Show failure to reconstruct with < threshold shares
+    - Confirm success with >= threshold shares
+    """
     print("\n" + "=" * 60)
     print("🔐 SECURITY PROPERTIES DEMONSTRATION")
     print("=" * 60)
@@ -113,6 +142,10 @@ def demonstrate_security_properties():
     print(f"   Result: {r} \n{'✅ CORRECT' if r == secret else '❌ INCORRECT'}")
 
 def demonstrate_different_configurations():
+    """
+    Demonstrate SMPC behavior across different configurations of (parties, threshold).
+    Includes positive and negative tests.
+    """
     print("\n" + "=" * 60)
     print("⚙️  DIFFERENT CONFIGURATION DEMONSTRATION")
     print("=" * 60)
@@ -172,6 +205,10 @@ def demonstrate_different_configurations():
         print(f"{config:<30} {str(result):<15} {status}")
 
 def performance_benchmark():
+    """
+    Benchmark SMPC runtime with increasingly large inputs.
+    Prints timings and verifies correctness of results.
+    """
     print("\n" + "="*60)
     print("⚡ PERFORMANCE BENCHMARK")
     print("="*60)
@@ -205,6 +242,10 @@ def performance_benchmark():
             print(f"{description:<20} {'ERROR':<12} {'N/A':<15} {'❌ FAIL':<10}")
 
 def interactive_menu():
+    """
+    Show interactive demo menu to the user.
+    Handles input routing to appropriate demo features.
+    """
     while True:
         print("\n" + "="*60)
         print("🎮 INTERACTIVE DEMO MENU")
@@ -248,6 +289,10 @@ def interactive_menu():
         input("\nPress Enter to continue...")
 
 def main():
+    """
+    Entry point for demo script.
+    Supports CLI flags for automated testing or benchmarking.
+    """
     print_banner()
     print("Welcome to the Secure Multi-Party Computation demonstration!")
     print("This demo shows how multiple parties can compute a sum of secrets")

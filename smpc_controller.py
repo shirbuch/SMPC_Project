@@ -1,23 +1,56 @@
+"""
+SMPC Controller Module
+
+Defines the `SMPCController` class responsible for coordinating secret sharing,
+local computation delegation, and secure reconstruction using Shamir's Secret Sharing.
+Also includes a `run_basic_functionality` diagnostic function.
+"""
+
 from typing import List, Dict, Optional
 from party import Party, Share
 import smpc_crypto as crypto
 
 
 class SMPCController:
-    """Secure Multi-Party Computation Controller using Shamir's Secret Sharing."""
+    """
+    Secure Multi-Party Computation Controller using Shamir's Secret Sharing.
+
+    Responsibilities:
+    - Generate shares for secrets
+    - Distribute shares to parties
+    - Collect local computation results
+    - Reconstruct the final result
+    """
 
     def __init__(self, num_parties: int = 3, threshold: int = 2):
+        """
+        Initialize controller with parties and threshold.
+
+        Args:
+            num_parties (int): Total number of parties.
+            threshold (int): Minimum number of parties required to reconstruct.
+
+        Raises:
+            ValueError: If threshold > num_parties
+        """
         if threshold > num_parties:
             raise ValueError("Threshold cannot exceed number of parties")
 
         self.num_parties = num_parties
         self.threshold = threshold
         self.prime = crypto.get_prime()
-        self.parties: List[Party] = [
-            Party(i+1) for i in range(num_parties)
-        ]
+        self.parties: List[Party] = [Party(i+1) for i in range(num_parties)]
 
     def create_shares_for_parties(self, secrets: List[int]) -> Dict[int, List[Share]]:
+        """
+        Create shares for each secret and assign them to parties.
+
+        Args:
+            secrets (List[int]): List of input secrets.
+
+        Returns:
+            Dict[int, List[Share]]: Mapping from party ID to list of Share objects.
+        """
         all_shares: List[List[Share]] = []
 
         # Create named shares for each secret
@@ -35,6 +68,15 @@ class SMPCController:
         return shares_by_party
 
     def request_parties_to_compute_results(self, shares_by_party: Dict[int, List[Share]]) -> Dict[int, int]:
+        """
+        Request each party to compute the sum of their shares.
+
+        Args:
+            shares_by_party (Dict[int, List[Share]]): Share assignments.
+
+        Returns:
+            Dict[int, int]: Mapping from party ID to their partial result.
+        """
         results = {}
         for party in self.parties:
             shares = shares_by_party.get(party.id, [])
@@ -43,6 +85,19 @@ class SMPCController:
         return results
 
     def reconstruct_final_result(self, partial_results: Dict[int, int], party_ids: Optional[List[int]] = None) -> int:
+        """
+        Reconstruct the full result using Lagrange interpolation.
+
+        Args:
+            partial_results (Dict[int, int]): Party ID to sum mappings.
+            party_ids (Optional[List[int]]): Specific party IDs to use (default: first `threshold`).
+
+        Returns:
+            int: Final reconstructed result.
+
+        Raises:
+            ValueError: If fewer than threshold results are provided.
+        """
         if party_ids is None:
             selected_ids = list(partial_results.keys())[:self.threshold]
         else:
@@ -56,12 +111,24 @@ class SMPCController:
         return crypto.reconstruct_secret(selected_partial_results, prime=self.prime)
 
     def run_secure_computation(self, secrets: List[int]) -> int:
+        """
+        End-to-end secure computation: share, compute, and reconstruct.
+
+        Args:
+            secrets (List[int]): Secrets to compute the sum of.
+
+        Returns:
+            int: Final reconstructed secure result.
+        """
         shares_by_party = self.create_shares_for_parties(secrets)
         partial_results = self.request_parties_to_compute_results(shares_by_party)
         return self.reconstruct_final_result(partial_results)
 
 
 def run_basic_functionality():
+    """
+    Run a sample SMPC computation for debugging or demonstration.
+    """
     print("=" * 50)
     print("======== SMPC System Basic Functionality =========")
     print("=" * 50)

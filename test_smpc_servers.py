@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
 """
 Comprehensive test suite for the SMPC (Secure Multi-Party Computation) system.
-Tests communication layer, party servers, and the TCP controller.
+Tests cover the party server, TCP-based controller, communication flow, and both
+mocked and real network integration scenarios.
+
+This suite ensures correctness of server behavior, share distribution,
+result aggregation, and interaction between distributed SMPC components.
 """
 
 import unittest
@@ -29,13 +33,25 @@ except ImportError as e:
 
 
 class TestPartyServer(unittest.TestCase):
-    """Test PartyServer functionality"""
+    """
+    Unit tests for the PartyServer class, verifying initialization,
+    handling of valid and invalid incoming actions, and integration
+    with share computation and messaging.
+    """
     
     def setUp(self):
+        """
+        Initialize a PartyServer instance with party_id=1 before each test.
+        """
         self.party_server = PartyServer(party_id=1)
     
     def test_party_server_initialization(self):
-        """Test that PartyServer initializes correctly"""
+        """
+        Test that PartyServer initializes its attributes correctly.
+
+        Asserts:
+            - ID, host, port, and name are correctly set.
+        """
         self.assertEqual(self.party_server.id, 1)
         self.assertEqual(self.party_server.host, '0.0.0.0')
         self.assertEqual(self.party_server.port, 8001)
@@ -45,8 +61,17 @@ class TestPartyServer(unittest.TestCase):
     @patch.object(PartyServer, 'compute_sum')
     @patch.object(PartyServer, 'unpack_compute_sum_request')
     def test_handle_incoming_compute_sum(self, mock_unpack, mock_compute, mock_send):
-        """Test handling of compute_sum action"""
-        # Setup mocks
+        """
+        Test PartyServer's ability to handle the 'compute_sum' action.
+
+        Mocks:
+            - Share unpacking
+            - Local computation
+            - Response transmission
+
+        Asserts:
+            - That each mocked method is called with expected arguments.
+        """
         mock_shares = [Mock(spec=Share), Mock(spec=Share)]
         mock_prime = 2**31 - 1
         mock_unpack.return_value = (mock_shares, mock_prime)
@@ -71,7 +96,12 @@ class TestPartyServer(unittest.TestCase):
         )
     
     def test_handle_incoming_unknown_action(self):
-        """Test handling of unknown action"""
+        """
+        Verify that PartyServer does not crash when receiving an unknown action.
+
+        Asserts:
+            - No exception is raised during execution.
+        """
         test_data = {'action': 'unknown_action'}
         
         # Should not raise an exception
@@ -82,13 +112,32 @@ class TestPartyServer(unittest.TestCase):
 
 
 class MockPartyServer:
-    """Mock party server for testing without network"""
+    """
+    Mock implementation of a party server for testing purposes
+    without actual network or computation logic.
+    """
     
     def __init__(self, party_id: int):
+        """
+        Initialize the mock server with a given party ID.
+
+        Args:
+            party_id (int): Unique identifier for the party.
+        """
         self.party_id = party_id
         self.received_data = []
     
     def receive_data(self, data):
+        """
+        Simulate receiving data and computing a fixed result
+        when the action is 'compute_sum'.
+
+        Args:
+            data (dict): Incoming data dictionary.
+
+        Returns:
+            dict: Mock computation result with party_id and fixed sum.
+        """
         self.received_data.append(data)
         # Simulate computation and return result
         if data.get('action') == 'compute_sum':
@@ -100,13 +149,22 @@ class MockPartyServer:
 
 
 class TestSMPCControllerTCP(unittest.TestCase):
-    """Test SMPCControllerTCP functionality"""
+    """
+    Unit tests for the SMPCControllerServer class.
+    Covers initialization, share distribution, result aggregation,
+    and input validation.
+    """
     
     def setUp(self):
+        """
+        Initialize an SMPCControllerServer with 3 parties and threshold=2.
+        """
         self.controller = SMPCControllerServer(num_parties=3, threshold=2)
     
     def test_controller_initialization(self):
-        """Test controller initialization"""
+        """
+        Verify that the controller initializes all expected attributes correctly.
+        """
         self.assertEqual(self.controller.host, '0.0.0.0')
         self.assertEqual(self.controller.port, 9000)
         self.assertEqual(len(self.controller.party_hosts), 3)
@@ -114,7 +172,12 @@ class TestSMPCControllerTCP(unittest.TestCase):
         self.assertEqual(self.controller.controller.threshold, 2)
     
     def test_handle_incoming(self):
-        """Test handling incoming party results"""
+        """
+        Test correct storage of valid party result upon receiving it.
+
+        Asserts:
+            - party_id is stored with the expected sum.
+        """
         test_data = {
             'party_id': 1,
             'sum': 12345
@@ -126,7 +189,9 @@ class TestSMPCControllerTCP(unittest.TestCase):
         self.assertEqual(self.controller.party_sums[1], 12345)
     
     def test_handle_incoming_invalid_data(self):
-        """Test handling invalid incoming data"""
+        """
+        Ensure controller does not crash on invalid input data and no results are stored.
+        """
         invalid_data = {'invalid': 'data'}
         
         # Should not raise an exception
@@ -140,7 +205,16 @@ class TestSMPCControllerTCP(unittest.TestCase):
     
     @patch.object(SMPCControllerServer, 'send_data')
     def test_distribute_shares(self, mock_send):
-        """Test share distribution to parties"""
+        """
+        Test whether controller correctly sends shares to all expected parties.
+
+        Args:
+            mock_send (Mock): Patched send_data method.
+
+        Asserts:
+            - Correct number of sends
+            - Valid structure of each message (action, shares, prime)
+        """
         secrets = [100, 200, 300]
         
         self.controller.distribute_shares(secrets)
@@ -159,17 +233,30 @@ class TestSMPCControllerTCP(unittest.TestCase):
             self.assertIn('prime', data)
     
     def test_reconstruct_sum_insufficient_parties(self):
-        """Test reconstruction with insufficient parties"""
-        self.controller.party_sums = {1: 100}  # Only one party
-        
+        """
+        Ensure that attempting to reconstruct with insufficient party results
+        raises a ValueError.
+
+        Raises:
+            ValueError: If fewer than `threshold` parties are present.
+        """
+        self.controller.party_sums = {1: 100}
         with self.assertRaises(ValueError):
             self.controller.reconstruct_final_result()
     
     @patch.object(SMPCController, 'reconstruct_final_result')
     def test_reconstruct_sum_success(self, mock_reconstruct):
-        """Test successful sum reconstruction"""
+        """
+        Verify successful sum reconstruction using mock reconstruction logic.
+
+        Args:
+            mock_reconstruct (Mock): Patched reconstruct_final_result method.
+
+        Asserts:
+            - Returned result matches mock
+            - Reconstruction method is called once
+        """
         mock_reconstruct.return_value = 42
-        
         self.controller.party_sums = {1: 100, 2: 200, 3: 300}
         
         result = self.controller.reconstruct_final_result()
@@ -179,13 +266,28 @@ class TestSMPCControllerTCP(unittest.TestCase):
 
 
 class TestIntegrationMocked(unittest.TestCase):
-    """Integration tests using mocked network communication"""
+    """
+    Integration-level tests for the SMPC system using mocks to simulate
+    network behavior and computation responses from parties.
+    """
     
     @patch('smpc_controller_server.time.sleep')
     @patch.object(SMPCControllerServer, 'send_data')
     @patch.object(SMPCControllerServer, 'start_listener')
     def test_full_computation_flow(self, mock_start_listener, mock_send_data, mock_sleep):
-        """Test the complete computation flow with mocked network"""
+        """
+        Simulates full end-to-end computation flow using mocked network and responses.
+
+        Steps:
+            - Controller distributes shares
+            - Mocked parties send results after a delay
+            - Controller reconstructs result
+
+        Asserts:
+            - Share distribution occurred
+            - Listener was activated
+            - Final result is an integer
+        """
         controller = SMPCControllerServer(num_parties=3, threshold=2)
         
         # Track when distribution happens so we can send responses after
@@ -227,10 +329,18 @@ class TestIntegrationMocked(unittest.TestCase):
 
 
 class TestRealNetworkIntegration(unittest.TestCase):
-    """Real network integration tests (optional, may be slow)"""
+    """
+    Integration test scaffold to verify availability of real network ports.
+    Can be used as a base for future full-stack tests.
+    """
     
     def setUp(self):
-        """Check if ports are available for testing"""
+        """
+        Verify that predefined ports (9001, 8004–8006) are available before running tests.
+
+        Sets:
+            self.ports_available (bool): Whether test can proceed.
+        """
         self.ports_available = True
         test_ports = [9001, 8004, 8005, 8006]  # Use different ports to avoid conflicts
         
@@ -242,10 +352,17 @@ class TestRealNetworkIntegration(unittest.TestCase):
                 self.ports_available = False
                 break
 
+
 def run_system_validation():
     """
-    Run a basic system validation to check if all components can be imported
-    and basic functionality works
+    Performs a series of basic validations to ensure system components
+    can be created and interact without runtime errors.
+
+    Returns:
+        bool: True if all validations passed, False if any component fails.
+
+    Prints:
+        Step-by-step validation progress and success/failure status.
     """
     print("Running system validation...")
     

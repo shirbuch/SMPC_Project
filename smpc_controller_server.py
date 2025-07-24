@@ -1,3 +1,11 @@
+"""
+SMPC Controller Server Module
+
+This module defines `SMPCControllerServer`, an interactive TCP-based controller for
+Secure Multi-Party Computation using Shamir's Secret Sharing. It distributes shares,
+collects results, and reconstructs the final computation securely over a network.
+"""
+
 import sys
 from smpc_controller import SMPCController
 from comm_layer import BaseServer
@@ -9,13 +17,37 @@ from party import Share
 
 
 class SMPCControllerServer(BaseServer):
+    """
+    TCP-enabled controller server for secure distributed computation.
+
+    Extends BaseServer to handle incoming data, manage party connections, and
+    coordinate secret sharing, result collection, and reconstruction.
+    """
+
     def __init__(self, num_parties: int = 3, threshold: int = 2):
+        """
+        Initialize the controller server.
+
+        Args:
+            num_parties (int): Number of party nodes.
+            threshold (int): Minimum required for reconstruction.
+        """
         super().__init__('0.0.0.0', 9000, "Controller")
         self.controller = SMPCController(num_parties=num_parties, threshold=threshold)
         self.party_hosts: List[Tuple[str, int]] = [("localhost", 8000 + i + 1) for i in range(num_parties)]
         self.party_sums: Dict[int, int] = {}
 
     def send_data_with_retry(self, host: str, port: int, data: dict, retries: int = 20, delay: float = 1.0):
+        """
+        Attempt to send data repeatedly to a party with retry logic.
+
+        Args:
+            host (str): Target host.
+            port (int): Target port.
+            data (dict): Payload to send.
+            retries (int): Max retry attempts.
+            delay (float): Delay between attempts (in seconds).
+        """
         for attempt in range(1, retries + 1):
             try:
                 self.send_data(host, port, data)
@@ -30,6 +62,12 @@ class SMPCControllerServer(BaseServer):
         self.send_data_with_retry(host, port, data, retries=retries, delay=delay)
 
     def distribute_shares(self, secrets: List[int]) -> None:
+        """
+        Generate and send secret shares to each party.
+
+        Args:
+            secrets (List[int]): Secret values to share.
+        """
         print(f"[{self.name}] Creating and distributing shares...")
         share_map = self.controller.create_shares_for_parties(secrets)
 
@@ -39,11 +77,17 @@ class SMPCControllerServer(BaseServer):
             print(f"[{self.name}] → {party.get_name()} at {host}:{port}: {[s.name for s in shares]}")
             self.send_data_with_retry(host, port, {
                 'action': 'compute_sum',
-                'shares': shares,                # list of Share objects
-                'prime': self.controller.prime   # send prime explicitly
+                'shares': shares,
+                'prime': self.controller.prime
             })
 
     def handle_incoming(self, data: dict):
+        """
+        Handle incoming results from parties.
+
+        Args:
+            data (dict): Expected to contain 'party_id' and 'sum' fields.
+        """
         pid = data.get('party_id')
         val = data.get('sum')
         if pid is None or val is None:
@@ -53,6 +97,15 @@ class SMPCControllerServer(BaseServer):
         print(f"[{self.name}] Received sum from Party {pid}: {Share.short(val)}")
 
     def reconstruct_final_result(self) -> int:
+        """
+        Reconstruct the final sum using received partial sums.
+
+        Returns:
+            int: The reconstructed result.
+
+        Raises:
+            ValueError: If not enough results are available.
+        """
         if len(self.party_sums) < self.controller.threshold:
             raise ValueError("Not enough party sums to reconstruct")
 
@@ -66,12 +119,22 @@ class SMPCControllerServer(BaseServer):
         return result
 
     def run(self, secrets: List[int]) -> int:
+        """
+        Run the full secure computation over TCP.
+
+        Args:
+            secrets (List[int]): Secret values to compute securely.
+
+        Returns:
+            int: The reconstructed final result.
+        """
         print(f"[{self.name}] Starting secure computation")
         self.party_sums.clear()
         self.start_listener()
 
         self.distribute_shares(secrets)
         print(f"[{self.name}] Waiting for results...")
+
         try:
             while len(self.party_sums) < self.controller.threshold:
                 time.sleep(0.2)
@@ -87,6 +150,9 @@ class SMPCControllerServer(BaseServer):
 
 
 def main():
+    """
+    Command-line interface to launch the controller server.
+    """
     import argparse
     parser = argparse.ArgumentParser(description="Run SMPC controller server.")
     parser.add_argument("secrets", nargs="+", type=int, help="List of secrets to compute securely.")

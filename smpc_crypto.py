@@ -3,13 +3,12 @@ Stateless Cryptographic Library for SMPC using Shamir's Secret Sharing.
 
 This module provides core primitives for secret sharing and reconstruction
 in a finite field, using Shamir's (t,n)-threshold scheme. It also includes
-homomorphic addition of shares for secure multiparty computation (SMPC).
+homomorphic addition of shares for secure multi-party computation (SMPC).
 """
 
 import secrets
 from typing import List, Optional, Tuple
 from Crypto.Util import number
-
 
 def get_prime(bits: int = 512) -> int:
     """
@@ -26,7 +25,6 @@ def get_prime(bits: int = 512) -> int:
     """
     return number.getPrime(bits)
 
-
 def _evaluate_polynomial(coefficients: List[int], x: int, prime: int) -> int:
     """
     Evaluate a polynomial at a given x using Horner's method modulo prime.
@@ -36,12 +34,16 @@ def _evaluate_polynomial(coefficients: List[int], x: int, prime: int) -> int:
 
     Args:
         coefficients (List[int]): Coefficients of the polynomial, ordered from a₀ (constant term) to aₙ.
+        x (int): Point at which to evaluate the polynomial.
+        prime (int): Prime modulus for finite field operations.
+
+    Returns:
+        int: Evaluated polynomial value modulo prime.
     """
     result = 0
     for coeff in reversed(coefficients):
         result = (result * x + coeff) % prime
     return result
-
 
 def _lagrange_interpolation(points: List[Tuple[int, int]], prime: int, x: int = 0) -> int:
     """
@@ -78,7 +80,6 @@ def _lagrange_interpolation(points: List[Tuple[int, int]], prime: int, x: int = 
 
     return result
 
-
 def create_shares(secret: int, threshold: int, num_shares: int, prime: int) -> List[Tuple[int, int]]:
     """
     Split a secret into multiple shares using Shamir's Secret Sharing scheme.
@@ -109,7 +110,6 @@ def create_shares(secret: int, threshold: int, num_shares: int, prime: int) -> L
     coefficients = [secret] + [secrets.randbelow(prime - 1) + 1 for _ in range(threshold - 1)]
     return [(i, _evaluate_polynomial(coefficients, i, prime)) for i in range(1, num_shares + 1)]
 
-
 def reconstruct_secret(shares: List[Tuple[int, int]], prime: int) -> int:
     """
     Reconstruct the original secret from a list of shares.
@@ -127,7 +127,6 @@ def reconstruct_secret(shares: List[Tuple[int, int]], prime: int) -> int:
     if len(shares) < 2:
         raise ValueError("At least 2 shares required for reconstruction")
     return _lagrange_interpolation(shares, prime)
-
 
 def add_shares(values: List[int], prime: int) -> int:
     """
@@ -155,10 +154,8 @@ def add_shares(values: List[int], prime: int) -> int:
     return sum(values) % prime
 
 
-# ----------------------------
-# Example Usage (for testing)
-# ----------------------------
 if __name__ == "__main__":
+    # Example usage: quick local validation
     secret = 12345
     threshold = 3
     num_shares = 5
