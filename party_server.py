@@ -1,10 +1,10 @@
 import sys
 from typing import List, Tuple
+from comm_layer import SecureBaseServer
 from party import Party, Share
-from comm_layer import BaseServer
 
 
-class PartyServer(BaseServer, Party):
+class PartyServer(SecureBaseServer, Party):
     """Party server that inherits from both BaseServer and Party"""
     
     def __init__(self, party_id: int, controller_host: str = 'localhost', controller_port: int = 9000):
@@ -13,7 +13,7 @@ class PartyServer(BaseServer, Party):
         
         # Initialize both parent classes
         Party.__init__(self, party_id)
-        BaseServer.__init__(self, host, port, self.get_name())
+        SecureBaseServer.__init__(self, host, port, self.get_name())
         
         self.controller_host = controller_host
         self.controller_port = controller_port

@@ -1,6 +1,6 @@
 import sys
 from smpc_controller import SMPCController
-from comm_layer import BaseServer
+from comm_layer import SecureBaseServer as BaseServer
 from typing import List, Dict, Tuple
 import threading
 import time
