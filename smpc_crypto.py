@@ -138,7 +138,7 @@ def add_shares(values: List[int], prime: int) -> int:
 
     Note:
         This does not reconstruct the final secret. It only adds local share values
-        under the field's modulus — a key step in homomorphic addition.
+        under the field's modulus.
 
     Args:
         values (List[int]): List of individual share values held by the party.
