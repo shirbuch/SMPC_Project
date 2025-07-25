@@ -83,7 +83,7 @@ def _lagrange_interpolation(points: List[Tuple[int, int]], prime: int, x: int = 
 def create_shares(secret: int, threshold: int, num_shares: int, prime: int) -> List[Tuple[int, int]]:
     """
     Split a secret into multiple shares using Shamir's Secret Sharing scheme.
-    The polynomial is randomly generated with uniformly chosen coefficients in ℤ_p \ {0},
+    The polynomial is randomly generated with uniformly chosen coefficients in Z_p\\{0},
     with the secret as the constant term.
 
     Note:

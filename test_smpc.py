@@ -55,15 +55,22 @@ class TestSMPCCrypto(unittest.TestCase):
             crypto.reconstruct_secret([], self.prime)
 
     def test_add_shares_valid(self):
-        """Should correctly add shares and reconstruct sum"""
+        """Should correctly add shares using crypto.add_shares and reconstruct sum"""
         s1, s2 = 100, 200
         shares1 = crypto.create_shares(s1, self.threshold, self.num_shares, self.prime)
         shares2 = crypto.create_shares(s2, self.threshold, self.num_shares, self.prime)
 
-        added = [(x[0], (x[1] + y[1]) % self.prime) for x, y in zip(shares1, shares2)]
-        result = crypto.reconstruct_secret(added[:self.threshold], self.prime)
+        # Add corresponding y-values (shares) with modular addition
+        added_shares = [
+            (x[0], crypto.add_shares([x[1], y[1]], self.prime))
+            for x, y in zip(shares1, shares2)
+        ]
+
+        # Reconstruct the secret sum from any threshold number of added shares
+        result = crypto.reconstruct_secret(added_shares[:self.threshold], self.prime)
         expected = (s1 + s2) % self.prime
         self.assertEqual(result, expected)
+
 
     def test_threshold_security(self):
         """Should fail below threshold, succeed at or above it"""
