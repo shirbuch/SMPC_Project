@@ -257,6 +257,27 @@ class TestCryptographicEdgeCases(unittest.TestCase):
         with self.assertRaises(ValueError):
             crypto._mod_inverse(6, 9)  # gcd(6,9) = 3 != 1
 
+    def test_reconstruct_secret_with_invalid_data(self):
+        prime = crypto.get_prime(256)
+        with self.assertRaises(ValueError):
+            crypto.reconstruct_secret([(1, 123), (1, 456)], prime)  # duplicate x
+
+    def test_add_shares_modulo(self):
+        prime = 101
+        values = [50, 60]
+        result = crypto.add_shares(values, prime)
+        self.assertEqual(result, (50 + 60) % prime)
+
+    def test_corrupted_share_value_reconstruction(self):
+        prime = crypto.get_prime(256)
+        good_shares = crypto.create_shares(9999, 2, 3, prime)
+        corrupted = (good_shares[0][0], (good_shares[0][1] + 12345) % prime)
+        with self.assertRaises(AssertionError):
+            self.assertEqual(
+                crypto.reconstruct_secret([corrupted, good_shares[1]], prime),
+                9999
+            )
+
 
 class TestSecurityBoundaryTests(unittest.TestCase):
     """Test security properties at the boundary conditions"""
