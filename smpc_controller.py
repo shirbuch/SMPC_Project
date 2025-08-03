@@ -12,7 +12,7 @@ Based on the improved design from SMPC_Project.py
 
 import time
 from typing import List, Dict, Optional, Tuple
-from party import DecentralizedParty, SecureChannel, SecureMessage
+from party import DecentralizedParty, Channel, Message
 import smpc_crypto as crypto
 
 class DecentralizedSMPCController:
@@ -60,7 +60,7 @@ class DecentralizedSMPCController:
         self.prime = prime if prime else crypto.get_prime(512)
 
         # Communication infrastructure
-        self.secure_channel = SecureChannel()
+        self.secure_channel = Channel()
 
         # Create decentralized parties
         self.parties: List[DecentralizedParty] = []
@@ -141,7 +141,7 @@ class DecentralizedSMPCController:
             print("❌ Some parties failed to distribute shares")
             return False
 
-        # Step 1b: All parties receive shares through secure channels
+        # Step 1b: All parties receive shares through channels
         max_rounds = 10  # Simulate asynchronous communication
         for round_num in range(max_rounds):
             reception_results = []

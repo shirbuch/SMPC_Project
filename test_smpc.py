@@ -30,7 +30,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import smpc_crypto as crypto
 from smpc_controller import DecentralizedSMPCController
-from party import DecentralizedParty, SecureChannel, Share
+from party import DecentralizedParty, Channel, Share
 
 
 class TestNormalOperationCases(unittest.TestCase):
@@ -423,7 +423,7 @@ class TestNetworkSimulationFailures(unittest.TestCase):
 
         prime = crypto.get_prime(256)
         parties = []
-        channel = SecureChannel()
+        channel = Channel()
 
         # Create parties
         for i in range(3):

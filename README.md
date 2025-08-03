@@ -94,7 +94,7 @@ pip install pycryptodome flask requests
 ### Protocol Flow
 
 1. **Share Distribution**: Each party creates shares of their secret using Shamir's scheme
-2. **Secure Communication**: Shares are distributed through secure channels
+2. **Secure Communication**: Shares are distributed through channels
 3. **Homomorphic Addition**: Parties compute sum shares without reconstructing secrets
 4. **Final Reconstruction**: Only the sum is reconstructed using threshold shares
 

@@ -8,7 +8,7 @@ parties via REST API calls.
 
 Features:
 - HTTP API for party operations
-- Secure communication between distributed parties
+- Communication between distributed parties
 - RESTful endpoints for SMPC protocol phases
 - Configuration for global deployment
 - Authentication and security

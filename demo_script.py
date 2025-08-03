@@ -89,7 +89,7 @@ def demonstrate_real_smpc_workflow():
     print(f"   • Companies: {len(secrets)}")
     print(f"   • Security threshold: {threshold}")
     print(f"   • Prime field size: {controller.prime.bit_length()} bits")
-    print(f"   • Communication: Peer-to-peer secure channels")
+    print(f"   • Communication: Peer-to-peer channels")
 
     print_step(2, "Phase 1: Decentralized Share Creation & Distribution",
                "ALL companies create and exchange shares simultaneously")

@@ -21,8 +21,8 @@ import queue
 import smpc_crypto as crypto
 
 @dataclass
-class SecureMessage:
-    """Represents a secure message between parties"""
+class Message:
+    """Represents a message between parties"""
     sender_id: int
     receiver_id: int
     message_type: str  # 'share_distribution', 'sum_share', etc.
@@ -30,8 +30,8 @@ class SecureMessage:
     timestamp: float = field(default_factory=time.time)
     message_id: str = field(default_factory=lambda: secrets.token_hex(8))
 
-class SecureChannel:
-    """Simulates secure point-to-point communication channels between parties"""
+class Channel:
+    """Simulates point-to-point communication channels between parties"""
 
     def __init__(self):
         self.message_queues = defaultdict(queue.Queue)  # receiver_id -> queue
@@ -39,14 +39,14 @@ class SecureChannel:
         self.total_messages = 0
         self.lock = threading.Lock()
 
-    def send_message(self, message: SecureMessage):
-        """Send a message through secure channel"""
+    def send_message(self, message: Message):
+        """Send a message through channel"""
         with self.lock:
             self.message_queues[message.receiver_id].put(message)
             self.message_log.append(message)
             self.total_messages += 1
 
-    def receive_messages(self, party_id: int) -> List[SecureMessage]:
+    def receive_messages(self, party_id: int) -> List[Message]:
         """Receive all pending messages for a party"""
         messages = []
         queue_obj = self.message_queues[party_id]
@@ -83,7 +83,7 @@ class Share:
 
 class DecentralizedParty:
     """
-    A truly decentralized party in SMPC that communicates only through secure channels.
+    A truly decentralized party in SMPC that communicates only through channels.
 
     Key features:
     - Creates and distributes shares of its own secret
@@ -93,7 +93,7 @@ class DecentralizedParty:
     """
 
     def __init__(self, party_id: int, secret_value: int, threshold: int, total_parties: int,
-                 secure_channel: SecureChannel, prime: int):
+                 secure_channel: Channel, prime: int):
         """
         Initialize a decentralized party.
 
@@ -153,7 +153,7 @@ class DecentralizedParty:
 
             # Distribute shares to all parties (including self)
             for share in self.my_secret_shares:
-                message = SecureMessage(
+                message = Message(
                     sender_id=self.party_id,
                     receiver_id=share.share_holder_id,
                     message_type='share_distribution',
@@ -309,8 +309,8 @@ if __name__ == "__main__":
     prime = crypto.get_prime(256)  # Smaller prime for testing
     secrets = [100, 200, 300]
 
-    # Create secure channel
-    channel = SecureChannel()
+    # Create channel
+    channel = Channel()
 
     # Create parties
     parties = []
