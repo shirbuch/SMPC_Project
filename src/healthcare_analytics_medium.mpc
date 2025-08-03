@@ -1,0 +1,149 @@
+# Healthcare Analytics SMPC Program - Medium Version
+# Corrected logic and input handling
+
+from Compiler.types import sint, sfix, Array, Matrix
+from Compiler.library import print_ln
+from Compiler.util import if_else
+
+# Medium configuration
+NUM_PARTIES = 4
+MAX_PATIENTS = 75
+
+def main():
+    print_ln("=" * 50)
+    print_ln("HEALTHCARE ANALYTICS - MEDIUM VERSION")
+    print_ln("Multi-Party Computation across %s hospitals", NUM_PARTIES)
+    print_ln("=" * 50)
+    
+    # Initialize data structures
+    patient_counts = Array(NUM_PARTIES, sint)
+    ages = Matrix(NUM_PARTIES, MAX_PATIENTS, sint)
+    costs = Matrix(NUM_PARTIES, MAX_PATIENTS, sint)
+    recovery_times = Matrix(NUM_PARTIES, MAX_PATIENTS, sint)
+    success_rates = Matrix(NUM_PARTIES, MAX_PATIENTS, sint)
+    severity_scores = Matrix(NUM_PARTIES, MAX_PATIENTS, sint)
+    
+    # Phase 1: Input Collection
+    print_ln("Phase 1: Collecting private data...")
+    for party in range(NUM_PARTIES):
+        hospital_names = ["Metropolitan General", "Regional Medical", 
+                         "University Research", "Community Healthcare"]
+        print_ln("Hospital %s (%s) inputting data...", party, hospital_names[party])
+        
+        # Get patient count first
+        patient_counts[party] = sint.get_input_from(party)
+        
+        # Get ages
+        for i in range(MAX_PATIENTS):
+            ages[party][i] = sint.get_input_from(party)
+        
+        # Get costs  
+        for i in range(MAX_PATIENTS):
+            costs[party][i] = sint.get_input_from(party)
+            
+        # Get recovery times
+        for i in range(MAX_PATIENTS):
+            recovery_times[party][i] = sint.get_input_from(party)
+            
+        # Get success rates
+        for i in range(MAX_PATIENTS):
+            success_rates[party][i] = sint.get_input_from(party)
+            
+        # Get severity scores
+        for i in range(MAX_PATIENTS):
+            severity_scores[party][i] = sint.get_input_from(party)
+    
+    print_ln("✅ All hospitals input complete")
+    
+    # Phase 2: Basic Statistics
+    print_ln("\nPhase 2: Computing statistics...")
+    
+    # Calculate totals
+    total_patients = sint(0)
+    sum_ages = sint(0)
+    sum_costs = sint(0)
+    sum_recovery = sint(0)
+    sum_successes = sint(0)
+    sum_severity = sint(0)
+    
+    for party in range(NUM_PARTIES):
+        total_patients = total_patients + patient_counts[party]
+        
+        for i in range(MAX_PATIENTS):
+            # Check if this patient slot is valid
+            valid = if_else(i < patient_counts[party], sint(1), sint(0))
+            
+            sum_ages = sum_ages + (ages[party][i] * valid)
+            sum_costs = sum_costs + (costs[party][i] * valid)
+            sum_recovery = sum_recovery + (recovery_times[party][i] * valid)
+            sum_successes = sum_successes + (success_rates[party][i] * valid)
+            sum_severity = sum_severity + (severity_scores[party][i] * valid)
+    
+    # Calculate averages (using fixed-point for precision)
+    avg_age = sfix(sum_ages) / sfix(total_patients)
+    avg_cost = sfix(sum_costs) / sfix(total_patients)
+    avg_recovery = sfix(sum_recovery) / sfix(total_patients)
+    success_rate = sfix(sum_successes) / sfix(total_patients)
+    avg_severity = sfix(sum_severity) / sfix(total_patients)
+    
+    # Output basic results
+    print_ln("--- BASIC STATISTICS ---")
+    print_ln("Total patients: %s", total_patients.reveal())
+    print_ln("Average age: %s years", avg_age.reveal())
+    print_ln("Average cost: $%s", avg_cost.reveal())
+    print_ln("Average recovery: %s days", avg_recovery.reveal())
+    print_ln("Success rate: %s%%", (success_rate * 100).reveal())
+    print_ln("Average severity: %s/10", avg_severity.reveal())
+    print_ln("Total spending: $%s", sum_costs.reveal())
+    
+    # Phase 3: Age Distribution
+    print_ln("\n--- AGE DISTRIBUTION ---")
+    young = sint(0)    # 18-40
+    middle = sint(0)   # 41-60  
+    senior = sint(0)   # 61+
+    
+    for party in range(NUM_PARTIES):
+        for i in range(MAX_PATIENTS):
+            valid = if_else(i < patient_counts[party], sint(1), sint(0))
+            age = ages[party][i]
+            
+            is_young = if_else((age >= 18) & (age <= 40), sint(1), sint(0))
+            is_middle = if_else((age >= 41) & (age <= 60), sint(1), sint(0))
+            is_senior = if_else(age >= 61, sint(1), sint(0))
+            
+            young = young + (is_young * valid)
+            middle = middle + (is_middle * valid)  
+            senior = senior + (is_senior * valid)
+    
+    print_ln("Young (18-40): %s patients", young.reveal())
+    print_ln("Middle (41-60): %s patients", middle.reveal())
+    print_ln("Senior (61+): %s patients", senior.reveal())
+    
+    # Phase 4: Cost Analysis
+    print_ln("\n--- COST ANALYSIS ---")
+    low_cost = sint(0)     # < $8000
+    med_cost = sint(0)     # $8000-$20000
+    high_cost = sint(0)    # > $20000
+    
+    for party in range(NUM_PARTIES):
+        for i in range(MAX_PATIENTS):
+            valid = if_else(i < patient_counts[party], sint(1), sint(0))
+            cost = costs[party][i]
+            
+            is_low = if_else(cost < 8000, sint(1), sint(0))
+            is_med = if_else((cost >= 8000) & (cost <= 20000), sint(1), sint(0))
+            is_high = if_else(cost > 20000, sint(1), sint(0))
+            
+            low_cost = low_cost + (is_low * valid)
+            med_cost = med_cost + (is_med * valid)
+            high_cost = high_cost + (is_high * valid)
+    
+    print_ln("Low cost (< $8,000): %s patients", low_cost.reveal())
+    print_ln("Medium cost ($8,000-$20,000): %s patients", med_cost.reveal()) 
+    print_ln("High cost (> $20,000): %s patients", high_cost.reveal())
+    
+    print_ln("\n" + "=" * 50)
+    print_ln("COMPUTATION COMPLETED SUCCESSFULLY")
+    print_ln("=" * 50)
+
+main()

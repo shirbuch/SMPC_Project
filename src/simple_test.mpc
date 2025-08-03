@@ -1,0 +1,54 @@
+# Simple Healthcare SMPC Test
+# Quick verification that the system works
+
+from Compiler.types import sint, sfix
+from Compiler.library import print_ln
+
+# Simple 4-party test
+NUM_PARTIES = 4
+
+def main():
+    print_ln("=== SIMPLE SMPC HEALTHCARE TEST ===")
+    print_ln("Testing basic functionality with %s hospitals", NUM_PARTIES)
+    
+    # Each hospital inputs just 3 values: patient_count, total_age, total_cost
+    patient_counts = Array(NUM_PARTIES, sint)
+    total_ages = Array(NUM_PARTIES, sint)  
+    total_costs = Array(NUM_PARTIES, sint)
+    
+    # Input phase - much simpler
+    for party in range(NUM_PARTIES):
+        hospital_names = ["Metropolitan General", "Regional Medical", 
+                         "University Research", "Community Healthcare"]
+        print_ln("Hospital %s (%s) inputting summary data...", 
+                party, hospital_names[party])
+        
+        patient_counts[party] = sint.get_input_from(party)
+        total_ages[party] = sint.get_input_from(party)
+        total_costs[party] = sint.get_input_from(party)
+    
+    print_ln("✅ All hospitals input their data")
+    
+    # Simple aggregation
+    total_patients = sint(0)
+    grand_total_age = sint(0)
+    grand_total_cost = sint(0)
+    
+    for party in range(NUM_PARTIES):
+        total_patients = total_patients + patient_counts[party]
+        grand_total_age = grand_total_age + total_ages[party]
+        grand_total_cost = grand_total_cost + total_costs[party]
+    
+    # Compute averages
+    avg_age = sfix(grand_total_age) / sfix(total_patients)
+    avg_cost = sfix(grand_total_cost) / sfix(total_patients)
+    
+    # Output results
+    print_ln("=== RESULTS ===")
+    print_ln("Total patients: %s", total_patients.reveal())
+    print_ln("Average age: %s years", avg_age.reveal())
+    print_ln("Average cost: $%s", avg_cost.reveal())
+    print_ln("Total spending: $%s", grand_total_cost.reveal())
+    print_ln("=== TEST COMPLETED SUCCESSFULLY ===")
+
+main()
