@@ -97,6 +97,8 @@ def create_shares(secret: int, threshold: int, num_shares: int, prime: int) -> L
 
     Returns:
         List[Tuple[int, int]]: List of (x, y) points representing the shares.
+        x-values are indexed integers from 1 to num_shares (inclusive) representing the party ID,
+        and y-values are the evaluated polynomial at those x-values.
 
     Raises:
         ValueError: If threshold > num_shares, or if inputs are invalid.
@@ -122,15 +124,20 @@ def reconstruct_secret(shares: List[Tuple[int, int]], prime: int) -> int:
         int: The reconstructed secret.
 
     Raises:
-        ValueError: If the number of shares is less than the reconstruction of line.
+        ValueError: If the number of shares is less than 2 or if x-values are not unique.
     """
     if len(shares) < 2:
         raise ValueError("At least 2 shares required for reconstruction")
+
+    x_values = [x for x, _ in shares]
+    if len(set(x_values)) < len(x_values):
+        raise ValueError("Duplicate x-values detected in shares, which is invalid for reconstruction.")
+
     return _lagrange_interpolation(shares, prime)
 
 def add_shares(values: List[int], prime: int) -> int:
     """
-    Compute the modular sum of share values.
+    Compute the modular sum of share y values.
 
     This function performs a simple homomorphic addition over a finite field.
     It is typically used by a party to locally compute the sum of its received shares,
@@ -141,7 +148,7 @@ def add_shares(values: List[int], prime: int) -> int:
         under the field's modulus.
 
     Args:
-        values (List[int]): List of individual share values held by the party.
+        values (List[int]): List of individual share y values held by the party.
         prime (int): The prime modulus defining the finite field.
 
     Returns:
@@ -153,13 +160,14 @@ def add_shares(values: List[int], prime: int) -> int:
     """
     return sum(values) % prime
 
-
 if __name__ == "__main__":
     # Example usage: quick local validation
     secret = 12345
     threshold = 3
     num_shares = 5
     prime = get_prime(512)
+
+    print(f"Generated prime: {prime}")
 
     print(f"Original Secret: {secret}")
     shares = create_shares(secret, threshold, num_shares, prime)
