@@ -4,11 +4,14 @@ Stateless Cryptographic Library for SMPC using Shamir's Secret Sharing.
 This module provides core primitives for secret sharing and reconstruction
 in a finite field, using Shamir's (t,n)-threshold scheme. It also includes
 homomorphic addition of shares for secure multi-party computation (SMPC).
+
+Fixed version with improved error handling and better field operations.
 """
 
 import secrets
 from typing import List, Optional, Tuple
 from Crypto.Util import number
+
 
 def get_prime(bits: int = 512) -> int:
     """
@@ -24,6 +27,38 @@ def get_prime(bits: int = 512) -> int:
         int: A probable prime number suitable for finite field operations.
     """
     return number.getPrime(bits)
+
+
+def _mod_inverse(a: int, m: int) -> int:
+    """
+    Calculate modular inverse using extended euclidean algorithm.
+
+    Args:
+        a (int): Number to find inverse of
+        m (int): Modulus
+
+    Returns:
+        int: Modular inverse of a mod m
+
+    Raises:
+        ValueError: If modular inverse doesn't exist
+    """
+
+    def extended_gcd(a, b):
+        if a == 0:
+            return b, 0, 1
+        gcd, x1, y1 = extended_gcd(b % a, a)
+        x = y1 - (b // a) * x1
+        y = x1
+        return gcd, x, y
+
+    if a < 0:
+        a = (a % m + m) % m
+    gcd, x, _ = extended_gcd(a, m)
+    if gcd != 1:
+        raise ValueError('Modular inverse does not exist')
+    return x % m
+
 
 def _evaluate_polynomial(coefficients: List[int], x: int, prime: int) -> int:
     """
@@ -44,6 +79,7 @@ def _evaluate_polynomial(coefficients: List[int], x: int, prime: int) -> int:
     for coeff in reversed(coefficients):
         result = (result * x + coeff) % prime
     return result
+
 
 def _lagrange_interpolation(points: List[Tuple[int, int]], prime: int, x: int = 0) -> int:
     """
@@ -74,11 +110,12 @@ def _lagrange_interpolation(points: List[Tuple[int, int]], prime: int, x: int = 
                 denominator = (xi - xj) % prime
                 if denominator == 0:
                     raise ValueError("Duplicate x-values in shares detected")
-                inv_denominator = pow(denominator, prime - 2, prime)
+                inv_denominator = _mod_inverse(denominator, prime)
                 term = (term * numerator * inv_denominator) % prime
         result = (result + term) % prime
 
     return result
+
 
 def create_shares(secret: int, threshold: int, num_shares: int, prime: int) -> List[Tuple[int, int]]:
     """
@@ -105,10 +142,15 @@ def create_shares(secret: int, threshold: int, num_shares: int, prime: int) -> L
         raise ValueError("Threshold cannot be greater than number of shares")
     if threshold < 1 or num_shares < 1:
         raise ValueError("Threshold and num_shares must be positive")
+    if prime <= 1:
+        raise ValueError("Prime must be greater than 1")
+
     secret = secret % prime  # Normalize into field
 
+    # Generate random coefficients (avoid 0 for non-constant terms)
     coefficients = [secret] + [secrets.randbelow(prime - 1) + 1 for _ in range(threshold - 1)]
     return [(i, _evaluate_polynomial(coefficients, i, prime)) for i in range(1, num_shares + 1)]
+
 
 def reconstruct_secret(shares: List[Tuple[int, int]], prime: int) -> int:
     """
@@ -122,26 +164,23 @@ def reconstruct_secret(shares: List[Tuple[int, int]], prime: int) -> int:
         int: The reconstructed secret.
 
     Raises:
-        ValueError: If the number of shares is less than the reconstruction of line.
+        ValueError: If the number of shares is insufficient for reconstruction.
     """
     if len(shares) < 2:
         raise ValueError("At least 2 shares required for reconstruction")
     return _lagrange_interpolation(shares, prime)
 
+
 def add_shares(values: List[int], prime: int) -> int:
     """
     Compute the modular sum of share values.
 
-    This function performs a simple homomorphic addition over a finite field.
-    It is typically used by a party to locally compute the sum of its received shares,
-    without revealing individual values.
-
-    Note:
-        This does not reconstruct the final secret. It only adds local share values
-        under the field's modulus.
+    This function performs homomorphic addition over a finite field.
+    In SMPC, parties can add their corresponding shares to compute
+    shares of the sum without revealing individual secrets.
 
     Args:
-        values (List[int]): List of individual share values held by the party.
+        values (List[int]): List of individual share values.
         prime (int): The prime modulus defining the finite field.
 
     Returns:
@@ -154,6 +193,21 @@ def add_shares(values: List[int], prime: int) -> int:
     return sum(values) % prime
 
 
+def multiply_share_by_constant(share_value: int, constant: int, prime: int) -> int:
+    """
+    Multiply a share by a constant (homomorphic scalar multiplication).
+
+    Args:
+        share_value (int): The share value to multiply
+        constant (int): The constant to multiply by
+        prime (int): The prime modulus
+
+    Returns:
+        int: The result of multiplying the share by the constant
+    """
+    return (share_value * constant) % prime
+
+
 if __name__ == "__main__":
     # Example usage: quick local validation
     secret = 12345
@@ -162,6 +216,8 @@ if __name__ == "__main__":
     prime = get_prime(512)
 
     print(f"Original Secret: {secret}")
+    print(f"Prime: {prime}")
+
     shares = create_shares(secret, threshold, num_shares, prime)
     print(f"Generated Shares: {shares}")
 
@@ -170,3 +226,21 @@ if __name__ == "__main__":
 
     recovered = reconstruct_secret(selected, prime)
     print(f"Recovered Secret: {recovered}")
+
+    # Test homomorphic addition
+    secret2 = 67890
+    shares2 = create_shares(secret2, threshold, num_shares, prime)
+
+    # Add corresponding shares
+    sum_shares = [(x1, add_shares([y1, y2], prime)) for (x1, y1), (x2, y2) in zip(shares, shares2)]
+
+    # Reconstruct sum
+    recovered_sum = reconstruct_secret(sum_shares[:threshold], prime)
+    expected_sum = (secret + secret2) % prime
+
+    print(f"\nHomomorphic Addition Test:")
+    print(f"Secret 1: {secret}")
+    print(f"Secret 2: {secret2}")
+    print(f"Expected Sum: {expected_sum}")
+    print(f"Recovered Sum: {recovered_sum}")
+    print(f"Test {'PASSED' if recovered_sum == expected_sum else 'FAILED'}")

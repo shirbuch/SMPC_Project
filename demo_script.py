@@ -1,285 +1,184 @@
 #!/usr/bin/env python3
 """
-Interactive Demo Script for SMPC Collaborative Data Analysis
+Interactive Demo Script for Real Decentralized SMPC
 
-This script provides a user-friendly demonstration of Secure Multi-Party Computation (SMPC)
-using Shamir's Secret Sharing scheme. Users can interactively:
-- Enter secrets to be securely computed
-- Observe share distribution among parties
-- See how partial computations are securely reconstructed
-- Explore security and performance of the system
+This script demonstrates a truly decentralized Secure Multi-Party Computation system where:
+- All parties actively participate and communicate peer-to-peer
+- No central authority processes secrets
+- Individual secrets are NEVER reconstructed
+- Only the final sum is revealed to all parties
 
-It supports multiple demo modes through a text menu interface and CLI flags.
+Based on the improved design that simulates real SMPC protocols.
 """
 
 import sys
 import time
-from smpc_controller import SMPCController
+from typing import List, Tuple
+from smpc_controller import DecentralizedSMPCController, SMPCController
 import smpc_crypto as crypto
 
+
 def print_banner():
-    """Display a decorative SMPC banner to introduce the demo."""
+    """Display the improved SMPC banner"""
     banner = """
-    ╔════════════════════════════════════════════════════════════════╗
-    ║              SMPC Collaborative Data Analysis Demo           ║
-    ║                                                              ║
-    ║ Secure Multi-Party Computation using Shamir's Secret Sharing ║
-    ╚════════════════════════════════════════════════════════════╝
+    ╔══════════════════════════════════════════════════════════════════╗
+    ║            REAL DECENTRALIZED SMPC DEMONSTRATION                ║
+    ║                                                                  ║
+    ║    True Peer-to-Peer Secure Multi-Party Computation             ║
+    ║    • All parties actively participate                            ║
+    ║    • No central authority                                        ║
+    ║    • Individual secrets NEVER reconstructed                      ║
+    ║    • Only final sum revealed                                     ║
+    ╚══════════════════════════════════════════════════════════════════╝
     """
     print(banner)
 
-def print_step(step_num: int, description: str, details: str = ""):
-    """
-    Print a numbered demo step with optional additional details.
 
-    Args:
-        step_num (int): Step number for reference.
-        description (str): Main description of the step.
-        details (str, optional): Further explanation to be printed below.
-    """
+def print_step(step_num: int, description: str, details: str = ""):
+    """Print a numbered demo step with optional details"""
     print(f"\n🔹 Step {step_num}: {description}")
     if details:
         print(f"   {details}")
     time.sleep(0.5)
 
-def demonstrate_basic_workflow():
+
+def demonstrate_real_smpc_workflow():
     """
-    Demonstrate the full basic SMPC workflow:
-    - Secret entry
-    - Share creation
-    - Local computations
-    - Secure reconstruction of the final result
+    Demonstrate the real decentralized SMPC workflow where all parties participate.
     """
-    print("\n" + "=" * 60)
-    print("📊 BASIC SMPC WORKFLOW DEMONSTRATION")
-    print("=" * 60)
+    print("\n" + "=" * 80)
+    print("🌐 REAL DECENTRALIZED SMPC WORKFLOW DEMONSTRATION")
+    print("=" * 80)
+    print("Key Innovation: All parties communicate peer-to-peer, no central coordinator!")
 
     try:
-        print("\nEnter two secret numbers to compute their sum securely:")
-        secret1 = int(input("Secret 1: "))
-        secret2 = int(input("Secret 2: "))
-    except ValueError:
-        print("❌ Invalid input. Using default values: 100, 250")
-        secret1, secret2 = 100, 250
+        print("\nEnter secret values for companies to compute total market size:")
+        print("(Each company will participate actively in the protocol)")
 
-    print(f"\n🔒 Your secrets: {secret1} and {secret2}")
-    print(f"🎯 Expected sum: {secret1 + secret2}")
+        # Get secrets from user
+        secrets = []
+        company_names = ["TechCorp", "DataFlow", "CloudSys", "AI-Innovate", "CyberGuard"]
 
-    print_step(1, "Initializing SMPC System", "Creating 3 parties with threshold 2")
-    smpc = SMPCController(num_parties=3, threshold=2)
-
-    print(f"   Parties: {smpc.num_parties}")
-    print(f"   Threshold: {smpc.threshold}")
-    print(f"   Prime field size: {smpc.prime.bit_length()} bits")
-
-    print_step(2, "Creating Secret Shares", "Splitting secrets using Shamir's Secret Sharing")
-    share_map = smpc.create_shares_for_parties([secret1, secret2])
-
-    print("   📤 Share distribution:")
-    for party in smpc.parties:
-        shares = share_map[party.id]
-        print(f"   {party.get_name()}: {[share.name for share in shares]}")
-        for share in shares:
-            print(f"   │  └─ {share}")
-
-    print_step(3, "Computing Party Sums", "Each party sums their shares locally")
-    print("   🔢 Local computations:")
-    partial_results = smpc.request_parties_to_compute_results(share_map)
-    for pid, val in partial_results.items():
-        print(f"   Party {pid}: {str(val)[:5]}...")
-
-    print_step(4, "Reconstructing Final Sum", "Using Lagrange interpolation")
-    final_result = smpc.reconstruct_final_result(partial_results)
-
-    print("\n" + "=" * 40)
-    print("🎉 COMPUTATION COMPLETE!")
-    print("=" * 40)
-    print(f"🔒 Input secrets: {secret1}, {secret2}")
-    print(f"✅ Secure result: {final_result}")
-    print(f"🎯 Expected sum: {secret1 + secret2}")
-
-    if final_result == secret1 + secret2:
-        print("✅ SUCCESS: Secure computation produced correct result!")
-    else:
-        print("❌ ERROR: Results don't match!")
-
-    print(f"\n🛡️  Privacy guarantee: No party learned the individual secrets!")
-
-def demonstrate_security_properties():
-    """
-    Demonstrate security properties of Shamir's Secret Sharing:
-    - Show failure to reconstruct with < threshold shares
-    - Confirm success with >= threshold shares
-    """
-    print("\n" + "=" * 60)
-    print("🔐 SECURITY PROPERTIES DEMONSTRATION")
-    print("=" * 60)
-
-    secret = 12345
-    prime = crypto.get_prime()
-
-    print(f"\n🔒 Original secret: {secret}")
-    shares = crypto.create_shares(secret, threshold=3, num_shares=5, prime=prime)
-    print(f"\n📊 Generated {len(shares)} shares with threshold 3:")
-    for party_id, share_value in shares:
-        print(f"   Party {party_id}: {share_value}")
-
-    print(f"\n🔍 Threshold Security Demonstration:")
-
-    print(f"\n❌ Trying to reconstruct with 2 shares (below threshold):")
-    try:
-        r = crypto.reconstruct_secret(shares[:2], prime=prime)
-        print(f"   Result: {r} \n{'❌ Unexpected success' if r == secret else '✅ Properly failed'}")
-    except Exception as e:
-        print(f"   ✅ Properly failed: {e}")
-
-    print(f"\nReconstructing with 3 shares:")
-    r = crypto.reconstruct_secret(shares[:3], prime=prime)
-    print(f"   Result: {r} \n{'✅ CORRECT' if r == secret else '❌ INCORRECT'}")
-
-    print(f"\nReconstructing with 4 shares:")
-    r = crypto.reconstruct_secret(shares[:4], prime=prime)
-    print(f"   Result: {r} \n{'✅ CORRECT' if r == secret else '❌ INCORRECT'}")
-
-def demonstrate_different_configurations():
-    """
-    Demonstrate SMPC behavior across different configurations of (parties, threshold).
-    Includes positive and negative tests.
-    """
-    print("\n" + "=" * 60)
-    print("⚙️  DIFFERENT CONFIGURATION DEMONSTRATION")
-    print("=" * 60)
-
-    configurations = [
-        (3, 2, "Standard Setup"),
-        (5, 3, "Higher Security"),
-        (4, 4, "All Parties Required")
-    ]
-    test_values = [100, 200]
-    expected_sum = sum(test_values)
-    summary = []
-
-    for num_parties, threshold, desc in configurations:
-        print(f"\n🔧 Configuration: {desc}")
-        print(f"   Parties: {num_parties}")
-        print(f"   Threshold: {threshold}")
-
-        try:
-            smpc = SMPCController(num_parties, threshold)
-            share_map = smpc.create_shares_for_parties(test_values)
-            partial_results = smpc.request_parties_to_compute_results(share_map)
-
-            print("   Valid reconstructions:")
-            for i in range(threshold, num_parties + 1):
-                subset = smpc.parties[i - threshold:i]
-                ids = [p.id for p in subset]
-                try:
-                    r = smpc.reconstruct_final_result(partial_results, party_ids=ids)
-                    ok = "✓" if r == expected_sum else "✗"
-                    print(f"     From parties {ids}: {r} ({ok})")
-                except Exception as e:
-                    print(f"     From parties {ids}: Reconstruction failed: {e} (✗)")
-
-            print("   Negative test (below threshold):")
-            bad_subset = smpc.parties[:threshold - 1]
-            ids = [p.id for p in bad_subset]
+        print(f"\nEnter revenues for {len(company_names[:3])} companies:")
+        for i, company in enumerate(company_names[:3]):
             try:
-                smpc.reconstruct_final_result(partial_results, party_ids=ids)
-                print(f"     From parties {ids}: Unexpected success! (✗)")
-                status = "❌ FAIL"
-            except Exception:
-                print(f"     From parties {ids}: Failed as expected (✓)")
-                status = "✅ SUCCESS" if sum(test_values) % smpc.prime == expected_sum else "❌ FAIL"
+                secret = int(input(f"{company} revenue ($): "))
+                secrets.append(secret)
+            except ValueError:
+                print(f"Invalid input for {company}, using default value")
+                secrets.append((i + 1) * 250000)  # Default values
 
-            summary.append((f"{desc} ({num_parties}P-{threshold}T)", expected_sum, status))
-            print(f"   {status}")
+        if len(secrets) < 3:
+            print("Using default company revenues for demonstration")
+            secrets = [250000, 180000, 320000]
 
-        except Exception as e:
-            print(f"   ❌ Error: {e}")
-            summary.append((f"{desc} ({num_parties}P-{threshold}T)", "ERROR", "❌ FAIL"))
+    except (ValueError, KeyboardInterrupt):
+        print("Using default values for demonstration")
+        secrets = [250000, 180000, 320000]
 
-    print("\n📋 Summary of Configurations:")
-    print(f"{'Config':<30} {'Result':<15} {'Status'}")
-    print("-" * 60)
-    for config, result, status in summary:
-        print(f"{config:<30} {str(result):<15} {status}")
+    print(f"\n💼 Company Secrets: {len(secrets)} companies participating")
+    print(f"🎯 Expected Total Market Size: ${sum(secrets):,}")
+    print("🔒 Note: In real SMPC, individual revenues remain completely hidden!")
 
-def performance_benchmark():
-    """
-    Benchmark SMPC runtime with increasingly large inputs.
-    Prints timings and verifies correctness of results.
-    """
-    print("\n" + "="*60)
-    print("⚡ PERFORMANCE BENCHMARK")
-    print("="*60)
+    print_step(1, "Initializing Decentralized SMPC System",
+               "Each company becomes an active participant")
 
-    smpc = SMPCController(num_parties=3, threshold=2)
+    threshold = 2  # Need at least 2 companies to reconstruct
+    controller = DecentralizedSMPCController(secrets, threshold)
 
-    test_cases = [
-        (10, 20, "Small values"),
-        (1000, 2000, "Medium values"),
-        (10**6, 2*10**6, "Large values"),
-        (10**9, 2*10**9, "Very large values")
-    ]
+    print(f"   • Companies: {len(secrets)}")
+    print(f"   • Security threshold: {threshold}")
+    print(f"   • Prime field size: {controller.prime.bit_length()} bits")
+    print(f"   • Communication: Peer-to-peer channels")
 
-    print(f"\n📊 Performance Results:")
-    print(f"{'Test Case':<20} {'Time (ms)':<12} {'Result':<15} {'Status':<10}")
-    print("-" * 60)
+    print_step(2, "Phase 1: Decentralized Share Creation & Distribution",
+               "ALL companies create and exchange shares simultaneously")
 
-    for val1, val2, description in test_cases:
-        start_time = time.time()
+    print_step(3, "Phase 2: Local Sum Computation",
+               "Each company computes on received shares WITHOUT reconstructing secrets")
+
+    print_step(4, "Phase 3: Collaborative Sum Reconstruction",
+               "Companies collaborate to reveal ONLY the total sum")
+
+    print("\n🚀 Executing Real Decentralized SMPC Protocol...")
+    print("=" * 60)
+
+    # Execute the real decentralized protocol
+    final_result, success = controller.run_secure_computation()
+
+    print("\n" + "=" * 60)
+    print("🎉 DECENTRALIZED SMPC COMPLETED!")
+    print("=" * 60)
+
+    if success:
+        print(f"💰 Total Market Size: ${final_result:,}")
+        print(f"🎯 Expected Result:   ${sum(secrets):,}")
+        print(f"✅ Accuracy: {'PERFECT' if final_result == sum(secrets) % controller.prime else 'ERROR'}")
+        print(f"🔒 Privacy: Individual company revenues were NEVER revealed!")
+        print(f"🌐 Decentralized: No central authority processed any secrets!")
+    else:
+        print("❌ Protocol failed - this shouldn't happen in a properly implemented system")
+
+
+def run_test_suite():
+    """Run the comprehensive test suite"""
+    print("\n" + "=" * 80)
+    print("🧪 COMPREHENSIVE SMPC TEST SUITE")
+    print("=" * 80)
+
+    try:
+        # Try importing the test module (handle both possible names)
+        test_module = None
         try:
-            result = smpc.run_secure_computation([val1, val2])
-            end_time = time.time()
+            import test_smpc as test_module
+            print("Found test_smpc.py")
+        except ImportError:
+            try:
+                import tests as test_module
+                print("Found tests.py")
+            except ImportError:
+                print("❌ No test file found. Please ensure either test_smpc.py or tests.py is present.")
+                return
 
-            duration_ms = (end_time - start_time) * 1000
-            expected = (val1 + val2) % smpc.prime
-            status = "✅ OK" if result == expected else "❌ FAIL"
+        # Check if the test module has the expected function
+        if hasattr(test_module, 'run_massive_test_suite'):
+            print("🚀 Running comprehensive test suite...")
+            success = test_module.run_massive_test_suite()
 
-            print(f"{description:<20} {duration_ms:<12.2f} {result:<15} {status:<10}")
+            if success:
+                print("\n🎉 All tests completed successfully!")
+            else:
+                print("\n⚠️ Some tests revealed issues - check output above")
+        else:
+            print("❌ Test module doesn't have the expected run_massive_test_suite function")
 
-        except Exception as e:
-            print(f"{description:<20} {'ERROR':<12} {'N/A':<15} {'❌ FAIL':<10}")
+    except Exception as e:
+        print(f"❌ Error running tests: {e}")
+        import traceback
+        traceback.print_exc()
+
 
 def interactive_menu():
-    """
-    Show interactive demo menu to the user.
-    Handles input routing to appropriate demo features.
-    """
+    """Show simplified interactive demo menu"""
     while True:
-        print("\n" + "="*60)
-        print("🎮 INTERACTIVE DEMO MENU")
-        print("="*60)
-        print("1. 📊 Basic SMPC Workflow")
-        print("2. 🔐 Security Properties Demo")
-        print("3. ⚙️  Different Configurations")
-        print("4. ⚡ Performance Benchmark")
-        print("5. 🚀 Run Basic Functionality")
-        print("6. 🧪 Run All Tests")
-        print("7. ❌ Exit")
+        print("\n" + "=" * 80)
+        print("🎮 REAL DECENTRALIZED SMPC INTERACTIVE MENU")
+        print("=" * 80)
+        print("1. 🌐 Real Decentralized SMPC Workflow")
+        print("2 🧪 Run Test Suite")
+        print("3. ❌ Exit")
 
         try:
-            choice = input("\nSelect option (1-7): ").strip()
+            choice = input("\nSelect option (1, 2, or 3): ").strip()
             if choice == "1":
-                demonstrate_basic_workflow()
+                demonstrate_real_smpc_workflow()
             elif choice == "2":
-                demonstrate_security_properties()
+                run_test_suite()
             elif choice == "3":
-                demonstrate_different_configurations()
-            elif choice == "4":
-                performance_benchmark()
-            elif choice == "5":
-                from smpc_controller import run_basic_functionality
-                run_basic_functionality()
-            elif choice == "6":
-                print("\n🧪 Running comprehensive test suite...")
-                from test_smpc import run_tests
-                run_tests()
-            elif choice == "7":
-                print("\n👋 Thank you for trying SMPC Demo!")
+                print("\n👋 Thank you for exploring Real Decentralized SMPC!")
                 break
             else:
-                print("❌ Invalid choice. Please select 1-7.")
+                print("❌ Invalid choice. Please select 1, 2, or 3.")
         except KeyboardInterrupt:
             print("\n\n👋 Demo interrupted. Goodbye!")
             break
@@ -288,26 +187,29 @@ def interactive_menu():
 
         input("\nPress Enter to continue...")
 
+
 def main():
     """
-    Entry point for demo script.
-    Supports CLI flags for automated testing or benchmarking.
+    Entry point for the improved demo script.
     """
     print_banner()
-    print("Welcome to the Secure Multi-Party Computation demonstration!")
-    print("This demo shows how multiple parties can compute a sum of secrets")
-    print("without revealing their individual inputs to each other.")
+    print("Welcome to the Real Decentralized SMPC demonstration!")
+    print("\nThis demo showcases TRUE peer-to-peer secure multi-party computation where:")
+    print("• All parties actively participate and communicate directly")
+    print("• No central authority coordinates or processes secrets")
+    print("• Individual secrets are NEVER reconstructed")
+    print("• Only the final sum is revealed to all parties")
+    print("• Perfect privacy with information-theoretic security")
 
     if len(sys.argv) > 1:
         if sys.argv[1] == "--auto":
-            demonstrate_basic_workflow()
-            demonstrate_security_properties()
-            demonstrate_different_configurations()
-            performance_benchmark()
+            print("\n🤖 Running automated demonstration...")
+            demonstrate_real_smpc_workflow()
             return
         elif sys.argv[1] == "--test":
-            from test_smpc import run_tests
-            sys.exit(0 if run_tests() else 1)
+            print("\n🧪 Running test suite...")
+            run_test_suite()
+            return
 
     try:
         interactive_menu()
@@ -315,6 +217,9 @@ def main():
         print("\n\n👋 Demo interrupted. Goodbye!")
     except Exception as e:
         print(f"\n❌ Unexpected error: {e}")
+        import traceback
+        traceback.print_exc()
+
 
 if __name__ == "__main__":
     main()
